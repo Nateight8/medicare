@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum AnchorStrategy {
+  FROM_LAST_TAKEN
+  FROM_SCHEDULED_TIME
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  phone         String?       @unique
+  name          String
+  passwordHash  String
+  timeZone      String        @default("UTC")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  prescriptions Prescription[]
+  doseEvents    DoseEvent[]
+}
+
+model Prescription {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  drugName        String
+  dosage          String
+  intervalHours   Int
+  startDate       DateTime
+  endDate         DateTime
+  status          PrescriptionStatus @default(ACTIVE)
+  anchorStrategy  AnchorStrategy @default(FROM_LAST_TAKEN)
+  nextDueAt       DateTime
+  lastTakenAt     DateTime?
+  dosesTaken      Int          @default(0)
+  missedCount     Int          @default(0)
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  doseEvents      DoseEvent[]
+  
+  @@index([userId])
+}
+
+model DoseEvent {
+  id              String      @id @default(cuid())
+  prescriptionId  String
+  prescription    Prescription @relation(fields: [prescriptionId], references: [id])
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  occurredAt      DateTime
+  scheduledFor    DateTime
+  action          String      // 'TAKEN' or 'SKIPPED'
+  latencyMinutes  Int?        // How late/early the dose was taken (in minutes)
+  note            String?     // Optional note about the dose
+  
+  @@index([prescriptionId])
+  @@index([userId])
+}

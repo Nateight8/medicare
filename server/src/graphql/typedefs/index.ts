@@ -1,7 +1,15 @@
-import { propertyTypeDefs } from "./property";
+import { mergeTypeDefs } from "@graphql-tools/merge";
 
-// Re-export the enums for use in resolvers
-export { PropertyType, PropertyStatus } from "./property";
+// Import type definitions
+import userTypeDefs from "./user.types";
+import prescriptionTypeDefs from "./prescription.types";
+import rootTypeDefs from "./root.types";
+import { authTypeDefs } from "./auth.types";
 
-// Export the combined type definitions
-export const typeDefs = propertyTypeDefs;
+// Combine all type definitions
+export const typeDefs = mergeTypeDefs([
+  userTypeDefs,
+  prescriptionTypeDefs,
+  rootTypeDefs,
+  authTypeDefs,
+]);
