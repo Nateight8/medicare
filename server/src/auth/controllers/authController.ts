@@ -44,8 +44,6 @@ export const authController = {
       user = await prisma.user.create({
         data: {
           email: payload.email,
-
-          // Add default fields here if needed
         },
       });
     }
@@ -62,8 +60,8 @@ export const authController = {
       );
     }
 
-    // Desktop QR fallback — optionally generate a requestId to track the session
-    const requestId = await magicLinkService.storeAuthRequest(payload.email);
+    // Desktop QR fallback — store userId instead of email
+    const requestId = await magicLinkService.storeAuthRequest(user.id);
     return res.redirect(
       `${process.env.WEB_APP_URL}/auth/qr?requestId=${encodeURIComponent(
         requestId
@@ -80,16 +78,22 @@ export const authController = {
     try {
       // Retrieve stored session from Redis
       const sessionKey = `auth:qr:${requestId}`;
-      const email = await redisUtil.get(sessionKey);
+      const userId = await redisUtil.get(sessionKey);
 
-      if (!email) {
+      if (!userId) {
         return res.status(400).json({ error: "Invalid or expired session" });
+      }
+
+      // Get user from DB
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
       }
 
       // Issue JWT
       const payload: TokenPayload = {
-        userId: "", // populate if available
-        email,
+        userId: user.id,
+        email: user.email,
         type: "magiclink",
       };
 
@@ -108,7 +112,19 @@ export const authController = {
       // Clean up Redis
       await redisUtil.del(sessionKey);
 
-      return res.json({ success: true });
+      // ✅ Send user data in response
+      return res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          timeZone: user.timeZone,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+      });
     } catch (err) {
       console.error("ContinueOnDevice error:", err);
       return res.status(500).json({ error: "Internal server error" });

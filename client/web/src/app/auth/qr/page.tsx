@@ -41,8 +41,11 @@ export default function Page() {
 
       if (!res.ok) throw new Error("Continue failed");
 
+      const data = await res.json();
+      console.log(data);
+
       // cookie now set → just redirect
-      window.location.href = "/";
+      // window.location.href = "/";
     } catch (err) {
       console.error(err);
     } finally {
