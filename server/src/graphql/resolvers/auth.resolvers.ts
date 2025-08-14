@@ -5,6 +5,24 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export const authResolvers = {
+  Query: {
+    me: async (_: any, __: any, context: any) => {
+      console.log("Context:");
+
+      // Return a mock user object
+      return {
+        id: "1",
+        email: "test@example.com",
+        name: "Test User",
+        phone: "+1234567890",
+        timeZone: "UTC",
+        prescriptions: [],
+        doseEvents: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    },
+  },
   Mutation: {
     /**
      * Create a new user account

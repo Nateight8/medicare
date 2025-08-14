@@ -28,9 +28,9 @@ export async function createServer() {
   );
   app.use(express.json());
   app.use(cookieParser());
-  
+
   // Mount auth routes under /api prefix
-  app.use('/api', authRoutes);
+  app.use("/api", authRoutes);
 
   const tokenService = new JWTTokenService(config);
 
@@ -51,32 +51,58 @@ export async function createServer() {
     expressMiddleware(server, {
       context: async ({ req, res }) => {
         try {
+          console.log("Received cookies:", req.cookies);
+
+          // Try to get token from Authorization header first
+          let token: string | undefined;
           const authHeader = req.headers.authorization;
-          if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return {
-              ...createContext(prisma),
-              user: null,
-              req,
-              res,
-            };
+
+          if (authHeader?.startsWith("Bearer ")) {
+            token = authHeader.split(" ")[1];
+            console.log("Using token from Authorization header");
+          }
+          // Then try to get token from cookies
+          else if (req.cookies?.auth_token) {
+            token = req.cookies.auth_token;
+            console.log("Using token from cookies");
           }
 
-          const token = authHeader.split(" ")[1];
-          const user = await tokenService.verifyToken(token as string);
+          if (!token) {
+            console.log("No authentication token found in headers or cookies");
+            return createContext(prisma, req, res, null);
+          }
 
-          return {
-            ...createContext(prisma),
-            user,
-            req,
-            res,
-          };
+          console.log("Extracted token:", token);
+          try {
+            const tokenPayload = await tokenService.verifyToken(
+              token as string
+            );
+            if (!tokenPayload) {
+              console.log("Invalid or expired token");
+              return createContext(prisma, req, res, null);
+            }
+
+            console.log("Token payload:", tokenPayload);
+
+            // Fetch the full user from the database
+            const user = await prisma.user.findUnique({
+              where: { id: tokenPayload.userId },
+            });
+
+            if (!user) {
+              console.log("User not found for ID:", tokenPayload.userId);
+              return createContext(prisma, req, res, null);
+            }
+
+            console.log("Fetched user:", user);
+
+            return createContext(prisma, req, res, user);
+          } catch (error) {
+            console.error("Error verifying token:", error);
+            throw error;
+          }
         } catch {
-          return {
-            ...createContext(prisma),
-            user: null,
-            req,
-            res,
-          };
+          return createContext(prisma, req, res, null);
         }
       },
     })

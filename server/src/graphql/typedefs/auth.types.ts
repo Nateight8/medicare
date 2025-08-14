@@ -6,16 +6,20 @@ export const authTypeDefs = gql`
     Request a magic link to be sent to the user's email
     """
     requestMagicLink(email: String!): Boolean!
-    
+
     """
     Verify a magic link token
     """
     verifyMagicLink(token: String!, email: String!): AuthPayload!
-    
+
     """
     Verify an OTP code
     """
     verifyOtp(email: String!, otp: String!): AuthPayload!
+  }
+
+  extend type Query {
+    me: User!
   }
 
   """

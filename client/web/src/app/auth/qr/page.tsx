@@ -27,28 +27,27 @@ export default function Page() {
       });
   }, [requestId]);
 
-  const handleContinueOnDevice = () => {
+  const handleContinue = async () => {
     if (!requestId) return;
+    // setLoading(true);
 
-    fetch("http://localhost:4000/api/auth/continue", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ requestId }),
-    })
-      .then((res: Response) => {
-        if (!res.ok) {
-          throw new Error("Failed to continue on device");
-        }
-        return res.json();
-      })
-      .then((data: { token: string; success: boolean }) => {
-        console.log("Continue on device response:", data);
-      })
-      .catch((error: Error) => {
-        console.error("Error:", error);
+    try {
+      const res = await fetch("http://localhost:4000/api/auth/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId }),
+        credentials: "include", // important for cookies
       });
+
+      if (!res.ok) throw new Error("Continue failed");
+
+      // cookie now set → just redirect
+      window.location.href = "/";
+    } catch (err) {
+      console.error(err);
+    } finally {
+      // setLoading(false);
+    }
   };
 
   return (
@@ -86,7 +85,7 @@ export default function Page() {
               variant="outline"
               type="button"
               className="w-full "
-              onClick={handleContinueOnDevice}
+              onClick={handleContinue}
             >
               Continue on this device
             </Button>
