@@ -8,13 +8,13 @@ class NodemailerEmailService implements EmailService {
     secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
     auth: {
       user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      pass: process.env.SMTP_PASSWORD, // Updated from SMTP_PASS to SMTP_PASSWORD
     },
   });
 
   async sendMagicLink(email: string, link: string): Promise<void> {
     const mailOptions = {
-      from: process.env.FROM_EMAIL,
+      from: process.env.SMTP_FROM_EMAIL, // Updated from FROM_EMAIL to SMTP_FROM_EMAIL
       to: email,
       subject: "Your Magic Login Link",
       html: `<p>Click the link below to log in:</p><a href="${link}">${link}</a>`,
@@ -25,7 +25,7 @@ class NodemailerEmailService implements EmailService {
 
   async sendOTP(email: string, otp: string): Promise<void> {
     const mailOptions = {
-      from: process.env.FROM_EMAIL,
+      from: process.env.SMTP_FROM_EMAIL, // Updated from FROM_EMAIL to SMTP_FROM_EMAIL
       to: email,
       subject: "Your One-Time Password (OTP)",
       html: `<p>Your OTP code is: <strong>${otp}</strong></p>`,
