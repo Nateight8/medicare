@@ -28,6 +28,9 @@ export async function createServer() {
   );
   app.use(express.json());
   app.use(cookieParser());
+  
+  // Mount auth routes under /api prefix
+  app.use('/api', authRoutes);
 
   const tokenService = new JWTTokenService(config);
 
