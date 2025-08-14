@@ -3,7 +3,8 @@ import prisma from './lib/prisma';
 
 export type Context = {
   prisma: PrismaClient;
-  userId?: string; // Will be set by the authentication middleware
+  userEmail?: string; // Will be set by the authentication middleware
+  user?: any; // The full user object if available
 };
 
 export const createContext = (): Context => ({

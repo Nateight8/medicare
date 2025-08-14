@@ -10,10 +10,8 @@ import { typeDefs } from "./typedefs";
 import { resolvers } from "./resolvers";
 import { createContext } from "./context";
 import { JWTTokenService } from "@/auth/services/tokenService";
-import { config } from "@/config";
 import prisma from "@/lib/prisma";
 
-// import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "@/auth/routes/authRoutes";
 
 export async function createServer() {
@@ -32,7 +30,11 @@ export async function createServer() {
   // Mount auth routes under /api prefix
   app.use("/api", authRoutes);
 
-  const tokenService = new JWTTokenService(config);
+  const tokenService = new JWTTokenService({
+    jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
+    tokenExpiry: process.env.JWT_EXPIRY || '1h',
+    magicLinkBaseUrl: process.env.MAGIC_LINK_BASE_URL || 'http://localhost:3000/auth/verify'
+  });
 
   const server = new ApolloServer({
     typeDefs,
@@ -69,7 +71,7 @@ export async function createServer() {
 
           if (!token) {
             console.log("No authentication token found in headers or cookies");
-            return createContext(prisma, req, res, null);
+            return createContext(prisma);
           }
 
           console.log("Extracted token:", token);
@@ -79,30 +81,42 @@ export async function createServer() {
             );
             if (!tokenPayload) {
               console.log("Invalid or expired token");
-              return createContext(prisma, req, res, null);
+              return createContext(prisma);
             }
 
             console.log("Token payload:", tokenPayload);
 
-            // Fetch the full user from the database
+            // Fetch the full user from the database using email, excluding sensitive fields
             const user = await prisma.user.findUnique({
-              where: { id: tokenPayload.userId },
+              where: { email: tokenPayload.email },
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                phone: true,
+                timeZone: true,
+                createdAt: true,
+                updatedAt: true
+              }
             });
 
             if (!user) {
-              console.log("User not found for ID:", tokenPayload.userId);
-              return createContext(prisma, req, res, null);
+              console.log("User not found for email:", tokenPayload.email);
+              // Create a minimal user object with just the email
+              const minimalUser = {
+                email: tokenPayload.email
+              };
+              return createContext(prisma, minimalUser);
             }
 
             console.log("Fetched user:", user);
-
-            return createContext(prisma, req, res, user);
+            return createContext(prisma, user);
           } catch (error) {
             console.error("Error verifying token:", error);
             throw error;
           }
         } catch {
-          return createContext(prisma, req, res, null);
+          return createContext(prisma);
         }
       },
     })

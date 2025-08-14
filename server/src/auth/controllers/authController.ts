@@ -4,6 +4,7 @@ import { MagicLinkServiceImpl } from "../services/magicLinkService";
 import { parse } from "useragent";
 import { redisUtil } from "@/lib/redis";
 import { TokenPayload } from "../types";
+import prisma from "@/lib/prisma";
 
 const magicLinkService = new MagicLinkServiceImpl({
   magicLinkBaseUrl:
@@ -32,6 +33,21 @@ export const authController = {
     const payload = await magicLinkService.validateToken(token);
     if (!payload) {
       return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    // ✅ Ensure user exists in DB
+    let user = await prisma.user.findUnique({
+      where: { email: payload.email },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: payload.email,
+
+          // Add default fields here if needed
+        },
+      });
     }
 
     // Detect device type

@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 export const authResolvers = {
   Query: {
     me: async (_: any, __: any, context: any) => {
-      console.log("Context:");
+      // console.log("Context:");
 
       // Return a mock user object
       return {

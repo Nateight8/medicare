@@ -1,26 +1,27 @@
-import { PrismaClient } from '@prisma/client';
-
+import { PrismaClient, User } from '@prisma/client';
 import { Request, Response } from 'express';
-import { User } from '@prisma/client';
+
+export type ContextUser = {
+  id?: string;
+  email: string;
+  name?: string | null;
+  phone?: string | null;
+  timeZone?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+} | null;
 
 export interface Context {
   prisma: PrismaClient;
-  user: User | null;
-  req: Request;
-  res: Response;
-  userId?: string;
+  user: ContextUser;
 }
 
 export function createContext(
-  prisma: PrismaClient, 
-  req?: Request, 
-  res?: Response,
-  user: User | null = null
+  prisma: PrismaClient,
+  user: ContextUser = null
 ): Context {
   return {
     prisma,
-    user,
-    req: req as Request,
-    res: res as Response,
+    user
   };
 }

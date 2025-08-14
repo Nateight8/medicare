@@ -39,7 +39,6 @@ export class MagicLinkServiceImpl implements MagicLinkService {
 
     try {
       const payload: TokenPayload = {
-        userId: "", // will be resolved when the user clicks the link
         email,
         type: "magiclink",
       };

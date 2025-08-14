@@ -16,7 +16,7 @@ export interface MagicLinkPayload {
 }
 
 export interface TokenPayload {
-  userId: string;
+  userId?: string;  // Made optional since we're using email as the primary identifier
   email: string;
   type: "magiclink" | "otp";
   iat?: number;
