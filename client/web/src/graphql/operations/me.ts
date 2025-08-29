@@ -11,4 +11,20 @@ export const meOperation = {
       }
     `,
   },
+  Mutations: {
+    updateProfile: gql`
+      mutation UpdateProfile($input: UpdateProfileInput!) {
+        updateProfile(input: $input) {
+          success
+        }
+      }
+    `,
+    logout: gql`
+      mutation Logout {
+        logout {
+          success
+        }
+      }
+    `,
+  },
 };

@@ -5,6 +5,8 @@ import { parse } from "useragent";
 import { redisUtil } from "@/lib/redis";
 import { TokenPayload } from "../types";
 import prisma from "@/lib/prisma";
+import crypto from "crypto";
+import { addDays, isBefore } from "date-fns";
 
 const magicLinkService = new MagicLinkServiceImpl({
   magicLinkBaseUrl:
@@ -90,26 +92,49 @@ export const authController = {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Issue JWT
+      // Access token payload
       const payload: TokenPayload = {
         userId: user.id,
         email: user.email,
         type: "magiclink",
       };
 
-      const token = await (magicLinkService as any)[
+      // 1️⃣ Issue short-lived access token
+      const accessToken = await (magicLinkService as any)[
         "tokenService"
       ].generateToken(payload, { expiresIn: process.env.JWT_EXPIRY || "1h" });
 
-      // Store token in HTTP-only cookie
-      res.cookie("auth_token", token, {
+      // 2️⃣ Generate and store long-lived refresh token
+      const refreshTokenValue = crypto.randomBytes(32).toString("hex");
+      const refreshTokenHash = crypto
+        .createHash("sha256")
+        .update(refreshTokenValue)
+        .digest("hex");
+
+      await prisma.refreshToken.create({
+        data: {
+          tokenHash: refreshTokenHash,
+          userId: user.id,
+          expiresAt: addDays(new Date(), 30), // 30 days validity
+        },
+      });
+
+      // 3️⃣ Store both tokens in HTTP-only cookies
+      res.cookie("auth_token", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: 3600 * 1000, // 1h
       });
 
-      // Clean up Redis
+      res.cookie("refresh_token", refreshTokenValue, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      // 4️⃣ Clean up Redis
       await redisUtil.del(sessionKey);
 
       // ✅ Send user data in response
@@ -123,10 +148,89 @@ export const authController = {
           timeZone: user.timeZone,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
+          onboarded: user.onboarded,
         },
       });
     } catch (err) {
       console.error("ContinueOnDevice error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+
+  async refreshToken(req: Request, res: Response) {
+    try {
+      const refreshTokenValue = req.cookies?.refresh_token;
+      if (!refreshTokenValue) {
+        return res.status(401).json({ error: "No refresh token provided" });
+      }
+
+      // Hash incoming token for DB lookup
+      const refreshTokenHash = crypto
+        .createHash("sha256")
+        .update(refreshTokenValue)
+        .digest("hex");
+
+      // Find token in DB
+      const storedToken = await prisma.refreshToken.findUnique({
+        where: { tokenHash: refreshTokenHash },
+        include: { user: true },
+      });
+
+      if (!storedToken || isBefore(storedToken.expiresAt, new Date())) {
+        return res
+          .status(401)
+          .json({ error: "Invalid or expired refresh token" });
+      }
+
+      const user = storedToken.user;
+
+      // Create new access token
+      const payload = {
+        userId: user.id,
+        email: user.email,
+        type: "refresh",
+      };
+
+      const newAccessToken = await (magicLinkService as any)[
+        "tokenService"
+      ].generateToken(payload, { expiresIn: process.env.JWT_EXPIRY || "1h" });
+
+      // 🔄 Optional: Rotate refresh token to prevent reuse
+      const newRefreshTokenValue = crypto.randomBytes(32).toString("hex");
+      const newRefreshTokenHash = crypto
+        .createHash("sha256")
+        .update(newRefreshTokenValue)
+        .digest("hex");
+
+      await prisma.$transaction([
+        prisma.refreshToken.delete({ where: { id: storedToken.id } }),
+        prisma.refreshToken.create({
+          data: {
+            tokenHash: newRefreshTokenHash,
+            userId: user.id,
+            expiresAt: addDays(new Date(), 30),
+          },
+        }),
+      ]);
+
+      // Set new cookies
+      res.cookie("auth_token", newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 3600 * 1000, // 1h
+      });
+
+      res.cookie("refresh_token", newRefreshTokenValue, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Refresh token error:", err);
       return res.status(500).json({ error: "Internal server error" });
     }
   },

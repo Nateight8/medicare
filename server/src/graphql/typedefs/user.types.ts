@@ -5,8 +5,8 @@ export const userTypeDefs = gql`
     id: ID!
     email: String!
     phone: String
-    name: String!
-    timeZone: String!
+    name: String
+    timeZone: String
     prescriptions: [Prescription!]!
     doseEvents: [DoseEvent!]!
     createdAt: String!
@@ -24,11 +24,6 @@ export const userTypeDefs = gql`
     name: String!
     phone: String
     timeZone: String = "UTC"
-  }
-
-  input LoginInput {
-    email: String!
-    password: String!
   }
 `;
 

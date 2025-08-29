@@ -6,6 +6,8 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import DisplayName from "./_components/display-name";
+import { useMutation } from "@apollo/client";
+import { meOperation } from "@/graphql/operations/me";
 
 // Define the form schema
 type FormValues = {
@@ -15,7 +17,7 @@ type FormValues = {
 const formSchema = z.object({
   name: z.string().min(2, {
     message: "Name must be at least 2 characters.",
-  })
+  }),
 });
 
 export default function OnboardPage() {
@@ -26,8 +28,24 @@ export default function OnboardPage() {
     },
   });
 
+  const [updateProfile, { loading }] = useMutation(
+    meOperation.Mutations.updateProfile,
+    {
+      onCompleted: () => {
+        console.log("Profile updated successfully");
+      },
+    }
+  );
+
   const onSubmit = (data: FormValues) => {
     console.log("Form submitted:", data);
+    updateProfile({
+      variables: {
+        input: {
+          name: data.name,
+        },
+      },
+    });
     // Handle form submission here
   };
 
@@ -44,11 +62,14 @@ export default function OnboardPage() {
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="w-full space-y-6"
+          >
             <div className="w-full">
               <DisplayName />
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={loading}>
               Complete Setup
             </Button>
           </form>

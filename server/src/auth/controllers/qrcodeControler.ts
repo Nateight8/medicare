@@ -1,3 +1,5 @@
+// src/auth/controllers/authController.ts
+
 import { Request, Response } from "express";
 import QRCode from "qrcode";
 

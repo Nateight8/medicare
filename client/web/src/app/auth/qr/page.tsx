@@ -3,6 +3,20 @@ import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+interface ContinueResponse {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    phone: string;
+    name: string;
+    timeZone: string;
+    createdAt: string;
+    updatedAt: string;
+    onboarded: boolean;
+  };
+}
+
 export default function Page() {
   const searchParams = useSearchParams();
   const requestId = searchParams.get("requestId");
@@ -41,11 +55,13 @@ export default function Page() {
 
       if (!res.ok) throw new Error("Continue failed");
 
-      const data = await res.json();
-      console.log(data);
+      const data: ContinueResponse = await res.json();
 
-      // cookie now set → just redirect
-      // window.location.href = "/";
+      if (data.user.onboarded === true) {
+        window.location.href = "/";
+      } else {
+        window.location.href = "/onboard";
+      }
     } catch (err) {
       console.error(err);
     } finally {

@@ -26,13 +26,24 @@ model User {
   email         String        @unique
   phone         String?       @unique
   name          String?
-  passwordHash  String?
   timeZone      String        @default("UTC")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   prescriptions Prescription[]
   doseEvents    DoseEvent[]
+  refreshTokens RefreshToken[]  @relation("UserRefreshTokens")
+  onboarded     Boolean       @default(false)
 }
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  user      User     @relation("UserRefreshTokens", fields: [userId], references: [id])
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 
 model Prescription {
   id              String       @id @default(cuid())

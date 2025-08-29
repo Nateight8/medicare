@@ -1,5 +1,5 @@
-import { PrismaClient, User } from '@prisma/client';
-import { Request, Response } from 'express';
+import { PrismaClient, User } from "@prisma/client";
+import { Request, Response } from "express";
 
 export type ContextUser = {
   id?: string;
@@ -14,14 +14,22 @@ export type ContextUser = {
 export interface Context {
   prisma: PrismaClient;
   user: ContextUser;
+  res?: Response | undefined;
+  req?: Request | undefined;
 }
 
 export function createContext(
   prisma: PrismaClient,
-  user: ContextUser = null
+  user: ContextUser = null,
+  res?: Response,
+  req?: Request
 ): Context {
   return {
     prisma,
-    user
+    user,
+    res,
+    req,
   };
 }
+
+export type GraphqlContext = Context;

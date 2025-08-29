@@ -9,14 +9,12 @@ export const rootTypeDefs = gql`
   }
 
   type Mutation {
-    # Auth
-    signup(input: CreateUserInput!): AuthPayload!
-    login(input: LoginInput!): AuthPayload!
-    
     # Prescriptions
     createPrescription(input: CreatePrescriptionInput!): Prescription!
-    updatePrescriptionStatus(input: UpdatePrescriptionStatusInput!): Prescription!
-    
+    updatePrescriptionStatus(
+      input: UpdatePrescriptionStatusInput!
+    ): Prescription!
+
     # Dosing
     recordDose(input: RecordDoseInput!): DoseEvent!
     markDoseTaken(prescriptionId: ID!): Prescription!

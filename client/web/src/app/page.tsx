@@ -1,15 +1,18 @@
 "use client";
 
-import { useQuery } from "@apollo/client";
-import { meOperation } from "@/graphql/operations/me";
 import EditProfileDialog from "./profile/_components/edit-dialotg";
+import { useAuth } from "../components/providers/auth-provider";
+import { Button } from "react-aria-components";
 
 export default function Home() {
-  const { data, loading, error } = useQuery(meOperation.Queries.me);
+  const { user, logout } = useAuth();
+
+  console.log(user);
 
   return (
     <div className="h-screen w-full flex items-center justify-center">
       {/* <QrWrapper /> */}
+      <Button onClick={() => logout()}>Logout</Button>
       <EditProfileDialog />
     </div>
   );

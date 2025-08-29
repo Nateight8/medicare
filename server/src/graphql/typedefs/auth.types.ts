@@ -1,51 +1,53 @@
 import { gql } from "graphql-tag";
 
 export const authTypeDefs = gql`
-  extend type Mutation {
-    """
-    Request a magic link to be sent to the user's email
-    """
-    requestMagicLink(email: String!): Boolean!
-
-    """
-    Verify a magic link token
-    """
-    verifyMagicLink(token: String!, email: String!): AuthPayload!
-
-    """
-    Verify an OTP code
-    """
-    verifyOtp(email: String!, otp: String!): AuthPayload!
-  }
-
   extend type Query {
+    """
+    Get the currently authenticated user's profile
+    """
     me: User!
   }
 
+  extend type Mutation {
+    """
+    Update the authenticated user's profile
+    """
+    updateProfile(input: UpdateProfileInput!): UpdateProfileResponse!
+    
+    """
+    Logout the current user and invalidate the session
+    """
+    logout: LogoutResponse!
+  }
+  
   """
-  Payload returned after successful authentication
+  Response for logout operation
   """
-  type AuthPayload {
-    token: String!
-    user: User!
+  type LogoutResponse {
+    success: Boolean!
   }
 
   """
-  Input for login with email and password
+  Input for updating user profile
   """
-  input LoginInput {
-    email: String!
-    password: String!
-  }
-
-  """
-  Input for creating a new user
-  """
-  input CreateUserInput {
-    email: String!
-    password: String!
-    name: String!
+  input UpdateProfileInput {
+    name: String
     phone: String
-    timeZone: String = "UTC"
+    timeZone: String
+  }
+
+  """
+  Response after updating a profile
+  """
+  type UpdateProfileResponse {
+    success: Boolean!
   }
 `;
+
+interface UpdateProfileInput {
+  name?: string;
+  phone?: string;
+  timeZone?: string;
+}
+
+export type { UpdateProfileInput };

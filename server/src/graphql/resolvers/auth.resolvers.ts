@@ -1,115 +1,143 @@
-// import bcrypt from 'bcrypt';
-import jwt from "jsonwebtoken";
-// import { AuthenticationError, UserInputError } from 'apollo-server-express';
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { GraphQLError } from "graphql";
+import { isValidIANA } from "@/graphql/utils/time-zone"; // <-- helper for time zone validation
+import { GraphqlContext } from "../context";
+import { UpdateProfileInput } from "../typedefs/auth.types";
+import { redisUtil } from "@/lib/redis";
+import { createHash } from "crypto";
 
 export const authResolvers = {
   Query: {
-    me: async (_: any, __: any, context: any) => {
-      // console.log("Context:");
+    me: async (_: any, __: any, ctx: GraphqlContext) => {
+      const { user } = ctx;
 
-      // Return a mock user object
-      return {
-        id: "1",
-        email: "test@example.com",
-        name: "Test User",
-        phone: "+1234567890",
-        timeZone: "UTC",
-        prescriptions: [],
-        doseEvents: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      if (!user?.id) {
+        throw new GraphQLError("Not authenticated", {
+          extensions: { code: "UNAUTHENTICATED" },
+        });
+      }
+
+      const updatedUser = await ctx.prisma.user.findUnique({
+        where: { id: user.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          timeZone: true,
+          onboarded: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!updatedUser) {
+        throw new GraphQLError("User not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+
+      return updatedUser;
     },
   },
+
   Mutation: {
-    /**
-     * Create a new user account
-     * @returns Authentication payload with token and user
-     */
-    signup: async (
-      _: any,
-      {
-        input,
-      }: {
-        input: {
-          email: string;
-          password: string;
-          name: string;
-          phone?: string;
-          timeZone?: string;
-        };
-      },
-      context: any
+    updateProfile: async (
+      _: unknown,
+      { input }: { input: UpdateProfileInput },
+      ctx: GraphqlContext
     ) => {
-      const { email, password, name, phone, timeZone = "UTC" } = input;
-
-      // Check if user already exists
-      const existingUser = await context.prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        // throw new UserInputError('Email already in use');
+      if (!ctx?.user?.id) {
+        throw new GraphQLError("Not authenticated", {
+          extensions: { code: "UNAUTHENTICATED" },
+        });
       }
 
-      // Hash password
-      // const passwordHash = await bcrypt.hash(password, 10);
+      const { name, phone, timeZone } = input;
 
-      // Create user
-      // const user = await context.prisma.user.create({
-      //   data: {
-      //     email,
-      //     name,
-      //     phone,
-      //     timeZone,
-      //     passwordHash,
-      //   },
-      // });
+      if (timeZone && !isValidIANA(timeZone)) {
+        throw new GraphQLError("Invalid timeZone", {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      }
 
-      // Generate JWT token
-      // const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+      const existingUser = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user.id },
+        select: { name: true, onboarded: true },
+      });
 
-      return {
-        // token,
-        // user,
-      };
+      if (!existingUser) {
+        throw new GraphQLError("User not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+
+      const data: Record<string, any> = {};
+      if (name !== undefined) data.name = name;
+      if (phone !== undefined) data.phone = phone;
+      if (timeZone !== undefined) data.timeZone = timeZone;
+
+      // Mark as onboarded if name is provided and it's not yet true
+      if (!existingUser.onboarded && name) {
+        data.onboarded = true;
+      }
+
+      try {
+        await ctx.prisma.user.update({
+          where: { id: ctx.user.id },
+          data,
+        });
+
+        return { success: true };
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          const field = e?.meta?.target?.[0] ?? "field";
+          throw new GraphQLError(`${field} already in use`, {
+            extensions: { code: "BAD_USER_INPUT" },
+          });
+        }
+        throw new GraphQLError("Failed to update profile", {
+          extensions: { code: "INTERNAL_SERVER_ERROR" },
+        });
+      }
     },
 
-    /**
-     * Authenticate a user and return a JWT token
-     * @returns Authentication payload with token and user
-     */
-    login: async (
-      _: any,
-      { input }: { input: { email: string; password: string } },
-      context: any
-    ) => {
-      const { email, password } = input;
-
-      // Find user by email
-      const user = await context.prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (!user) {
-        // throw new AuthenticationError('Invalid email or password');
+    logout: async (_: unknown, __: unknown, ctx: GraphqlContext) => {
+      const { user, prisma, res, req } = ctx;
+      if (!user?.id) {
+        return { success: true }; // Already logged out
       }
 
-      // Verify password
-      // const valid = await bcrypt.compare(password, user.passwordHash);
-      // if (!valid) {
-      //   throw new AuthenticationError('Invalid email or password');
-      // }
+      try {
+        const refreshTokenValue = req?.cookies?.refresh_token;
+        if (refreshTokenValue) {
+          // Hash it for DB lookup
+          const refreshTokenHash = createHash("sha256")
+            .update(refreshTokenValue)
+            .digest("hex");
 
-      // Generate JWT token
-      // const token = jwt.sign({ userId: user.id }, JWT_SECRET);
+          // Delete refresh token from DB
+          await prisma.refreshToken.deleteMany({
+            where: { tokenHash: refreshTokenHash, userId: user.id },
+          });
+        }
 
-      return {
-        token: "",
-        user,
-      };
+        // Clear cookies
+        res?.clearCookie("auth_token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+        });
+        res?.clearCookie("refresh_token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+        });
+
+        return { success: true };
+      } catch (err) {
+        console.error("Logout error:", err);
+        return { success: false };
+      }
     },
   },
 };
