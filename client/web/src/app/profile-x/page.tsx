@@ -25,6 +25,7 @@ import {
   Monitor,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Reusable Care Circle List
 function CareCircleList() {
@@ -204,10 +205,7 @@ export default function ProfilePage() {
               </div>
               <ChevronRight className="w-4 h-4" />
             </button>
-            <div className="flex items-center justify-between p-4">
-              <span className="text-sm font-medium">Dark Mode</span>
-              <Switch />
-            </div>
+            <ThemeToggle />
           </div>
         </div>
 

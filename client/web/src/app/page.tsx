@@ -3,6 +3,7 @@
 import EditProfileDialog from "./profile/_components/edit-dialotg";
 import { useAuth } from "../components/providers/auth-provider";
 import { Button } from "react-aria-components";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -14,6 +15,8 @@ export default function Home() {
       {/* <QrWrapper /> */}
       <Button onClick={() => logout()}>Logout</Button>
       <EditProfileDialog />
+
+      <ThemeToggle />
     </div>
   );
 }
