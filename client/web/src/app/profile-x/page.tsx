@@ -56,7 +56,7 @@ function CareCircleList() {
             </Avatar>
             <div className="flex-1">
               <p className="font-medium">{caregiver.name}</p>
-              <p className="text-sm text-gray-500">{caregiver.role}</p>
+              <p className="text-sm text-muted-foreground">{caregiver.role}</p>
             </div>
             <Button variant="ghost" size="sm">
               View
@@ -92,11 +92,11 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <div className="rounded-xl shadow-sm p-6 flex flex-col items-center space-y-4">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-              <User className="w-12 h-12 text-gray-500" />
+            <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center overflow-hidden">
+              <User className="w-12 h-12 text-background" />
             </div>
-            <button className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition-colors">
-              <Camera className="w-4 h-4 text-white" />
+            <button className="absolute -bottom-1 -right-1 w-8 h-8 bg-secondary rounded-full flex items-center justify-center shadow-lg hover:bg-secondary/80 hover:backdrop-blur-3xl cursor-pointer transition-colors">
+              <Camera className="w-4 h-4 text-background" />
             </button>
           </div>
           <div className="text-center space-y-1">
@@ -116,7 +116,9 @@ export default function ProfilePage() {
                 <Phone className="w-5 h-5" />
                 <div>
                   <p className="text-sm font-medium">Phone Number</p>
-                  <p className="text-sm">+1 (555) 123-4567</p>
+                  <p className="text-sm text-muted-foreground">
+                    +1 (555) 123-4567
+                  </p>
                 </div>
               </div>
             </div>
@@ -125,7 +127,9 @@ export default function ProfilePage() {
                 <Calendar className="w-5 h-5" />
                 <div>
                   <p className="text-sm font-medium">Date of Birth</p>
-                  <p className="text-sm">March 15, 1985</p>
+                  <p className="text-sm text-muted-foreground">
+                    March 15, 1985
+                  </p>
                 </div>
               </div>
             </div>
@@ -145,7 +149,9 @@ export default function ProfilePage() {
             <h3 className="font-medium">Emergency Contact</h3>
           </div>
           <div className="p-4">
-            <p className="text-sm">John Johnson — +1 (555) 987-6543</p>
+            <p className="text-sm text-muted-foreground">
+              John Johnson — +1 (555) 987-6543
+            </p>
           </div>
         </div>
 
@@ -224,8 +230,8 @@ export default function ProfilePage() {
             </button>
             <button className="flex items-center justify-between w-full p-4 hover:bg-muted transition-colors group">
               <div className="flex items-center space-x-3">
-                <Trash2 className="w-5 h-5 text-red-600" />
-                <span className="text-sm font-medium text-red-600 group-hover:text-red-700">
+                <Trash2 className="w-5 h-5 text-destructive" />
+                <span className="text-sm font-medium text-destructive group-hover:text-destructive/80">
                   Delete Account
                 </span>
               </div>
