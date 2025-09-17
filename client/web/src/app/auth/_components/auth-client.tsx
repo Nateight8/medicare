@@ -2,19 +2,11 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RefreshCw } from "lucide-react";
-import { AsclepiusIcon } from "@phosphor-icons/react";
-import Submitted from "./submitted";
 import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth";
-
-interface EmailState {
-  email: string;
-  timestamp: number;
-  expiresAt: number;
-}
+import Check from "./check";
 
 export default function AuthClient() {
   const {
@@ -23,7 +15,6 @@ export default function AuthClient() {
     emailError,
     isLoading,
     timeLeft,
-    canResend,
     resendCooldown,
     expiresIn,
     setEmail,
@@ -39,11 +30,10 @@ export default function AuthClient() {
 
   if (success) {
     return (
-      <Submitted
+      <Check
         email={email}
         timeLeft={timeLeft}
         handleResend={handleResend}
-        canResend={canResend}
         resendCooldown={resendCooldown}
         handleUseDifferentEmail={handleUseDifferentEmail}
         expiresIn={expiresIn}
@@ -80,7 +70,7 @@ export default function AuthClient() {
             <Button
               type="submit"
               size="lg"
-              // variant="secondary"
+              effect="ringHover"
               className="w-full"
               disabled={isLoading}
             >
@@ -105,6 +95,7 @@ export default function AuthClient() {
 
             <Button
               size="lg"
+              effect="ringHover"
               type="button"
               variant="outline"
               className="w-full "

@@ -23,10 +23,10 @@ export const authController = {
     if (!email) return res.status(400).json({ error: "Email is required" });
 
     const result = await magicLinkService.requestMagicLink(email);
-    return res.status(200).json({ 
-      message: "Magic link sent!", 
+    return res.status(200).json({
+      message: "Magic link sent!",
       success: true,
-      expiresIn: result.expiresIn
+      expiresIn: result.expiresIn,
     });
   },
 

@@ -41,8 +41,6 @@ export default function Page() {
       });
   }, [requestId]);
 
-  const channel = new BroadcastChannel("auth");
-
   const handleContinue = async () => {
     if (!requestId) return;
     // setLoading(true);
@@ -60,10 +58,8 @@ export default function Page() {
       const data: ContinueResponse = await res.json();
 
       if (data.user.onboarded === true) {
-        channel.postMessage("logged_in");
         window.location.href = "/";
       } else {
-        channel.postMessage("onboard");
         window.location.href = "/onboard";
       }
     } catch (err) {
@@ -74,9 +70,9 @@ export default function Page() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-md md:p-8">
+    <div className="flex flex-col gap-6">
       <>
-        <div className="flex flex-col gap-6 md:p-6">
+        <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
             {qrCode ? (
               <img
@@ -105,9 +101,7 @@ export default function Page() {
           </div>
           <div className="">
             <Button
-              effect="ringHover"
               variant="outline"
-              size="lg"
               type="button"
               className="w-full "
               onClick={handleContinue}
