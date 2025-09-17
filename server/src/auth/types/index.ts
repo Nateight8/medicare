@@ -36,7 +36,7 @@ export interface AuthenticatedRequest extends Request {
 export interface User extends PrismaUser {}
 
 export interface MagicLinkService {
-  requestMagicLink(email: string): Promise<void>;
+  requestMagicLink(email: string): Promise<{ expiresIn: string }>;
   validateToken(token: string): Promise<TokenPayload | null>;
 }
 

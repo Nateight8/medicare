@@ -13,7 +13,7 @@ const magicLinkService = new MagicLinkServiceImpl({
     process.env.BACKEND_URL ||
     "http://localhost:4000/api/auth/magiclink/validate",
   jwtSecret: process.env.JWT_SECRET || "your-secret-key",
-  tokenExpiry: "1h",
+  tokenExpiry: "5m",
   redisPrefix: "auth:",
 });
 
@@ -22,8 +22,12 @@ export const authController = {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    await magicLinkService.requestMagicLink(email);
-    return res.status(200).json({ message: "Magic link sent!", success: true });
+    const result = await magicLinkService.requestMagicLink(email);
+    return res.status(200).json({ 
+      message: "Magic link sent!", 
+      success: true,
+      expiresIn: result.expiresIn
+    });
   },
 
   async validateMagicLink(req: Request, res: Response) {

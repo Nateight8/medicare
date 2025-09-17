@@ -10,6 +10,18 @@ export default function Home() {
 
   console.log(user);
 
+  const channel = new BroadcastChannel("auth");
+
+  console.log("CHANNEL:", channel);
+
+  channel.postMessage("login");
+
+  channel.onmessage = (e) => {
+    console.log(e);
+  };
+
+  console.log("CHANNEL MSG:");
+
   return (
     <div className="h-screen w-full flex items-center justify-center">
       {/* <QrWrapper /> */}

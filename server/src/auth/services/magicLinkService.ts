@@ -5,25 +5,25 @@ import type { MagicLinkService, TokenPayload, AuthConfig } from "../types";
 import { randomUUID } from "crypto";
 
 export class MagicLinkServiceImpl implements MagicLinkService {
-  private config: Required<AuthConfig>;
-  private tokenService: JWTTokenService;
+  private readonly config: Required<AuthConfig>;
+  private readonly tokenService: JWTTokenService;
+  private readonly tokenExpiry: string;
 
   constructor(config: AuthConfig) {
-    // Set default values
+    // Ensure tokenExpiry is always a string
+    this.tokenExpiry = typeof config.tokenExpiry === 'number' 
+      ? `${config.tokenExpiry}ms` 
+      : config.tokenExpiry || '1h';
+    
     this.config = {
-      magicLinkBaseUrl: config.magicLinkBaseUrl,
-      jwtSecret: config.jwtSecret,
-      tokenExpiry: config.tokenExpiry || "15m",
-      redisPrefix: config.redisPrefix || "auth:",
+      magicLinkBaseUrl: config.magicLinkBaseUrl || '',
+      jwtSecret: config.jwtSecret || 'your-secret-key',
+      tokenExpiry: this.tokenExpiry,
+      redisPrefix: config.redisPrefix || 'auth:',
     };
 
-    // Ensure redisPrefix ends with a colon
-    if (!this.config.redisPrefix.endsWith(":")) {
-      this.config.redisPrefix = `${this.config.redisPrefix}:`;
-    }
-
     this.tokenService = new JWTTokenService(this.config);
-
+    
     console.log("[MagicLinkService] Initialized with config:", {
       ...this.config,
       jwtSecret: "***", // Hide actual secret in logs
@@ -34,7 +34,7 @@ export class MagicLinkServiceImpl implements MagicLinkService {
     return `${this.config.redisPrefix}magiclink:${token}`;
   }
 
-  async requestMagicLink(email: string): Promise<void> {
+  async requestMagicLink(email: string): Promise<{ expiresIn: string }> {
     console.log(`[MagicLinkService] Requesting magic link for: ${email}`);
 
     try {
@@ -67,6 +67,9 @@ export class MagicLinkServiceImpl implements MagicLinkService {
       console.log(`[MagicLinkService] Sending magic link email to: ${email}`);
       await emailService.sendMagicLink(email, link);
       console.log("[MagicLinkService] Magic link email sent successfully");
+      
+      // Return the token's expiration time as a string
+      return { expiresIn: this.tokenExpiry };
     } catch (error) {
       console.error("[MagicLinkService] Error in requestMagicLink:", error);
       throw error;
