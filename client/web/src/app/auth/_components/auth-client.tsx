@@ -5,12 +5,9 @@ import type React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RefreshCw } from "lucide-react";
-import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth";
+import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth-query";
 import Check from "./check";
-import { useEffect, useState } from "react";
-import { pollAuth } from "@/lib/api";
 import Validated from "./validated";
-import { useQuery } from "@tanstack/react-query";
 
 export default function AuthClient() {
   const {
@@ -21,45 +18,19 @@ export default function AuthClient() {
     timeLeft,
     resendCooldown,
     expiresIn,
+    isAuthenticated,
     setEmail,
     sendMagicLink,
     handleResend,
     handleUseDifferentEmail,
-  } = useMagicLinkAuth("http://localhost:4000/api/auth/magiclink");
-
-  const [showClicked, setShowClicked] = useState(false);
+  } = useMagicLinkAuth();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     await sendMagicLink(email);
   };
 
-  interface PollResponse {
-    status: 'pending' | 'validated' | 'not_started';
-  }
-
-  const { data } = useQuery<PollResponse>({
-    queryKey: ["auth-status", email],
-    queryFn: () => pollAuth({ email }),
-    enabled: !!email && success, // Only run the query if email exists and success is true
-    refetchInterval: (query) => {
-      // Stop polling if we get a validated status
-      const data = query.state.data;
-      return data?.status === 'validated' ? false : 2000;
-    },
-  });
-
-  // Update UI when status changes to validated
-  useEffect(() => {
-    if (data?.status === 'validated') {
-      setShowClicked(true);
-    }
-  }, [data?.status]);
-
-  console.log("data", data);
-  console.log("showClicked", showClicked);
-
-  if (showClicked) {
+  if (isAuthenticated) {
     return <Validated />;
   }
 
