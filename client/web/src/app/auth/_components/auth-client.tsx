@@ -8,8 +8,9 @@ import { RefreshCw } from "lucide-react";
 import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth";
 import Check from "./check";
 import { useEffect, useState } from "react";
-import pollAuthStatus from "@/lib/poll-auth-status";
+import { pollAuth } from "@/lib/api";
 import Validated from "./validated";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AuthClient() {
   const {
@@ -33,22 +34,34 @@ export default function AuthClient() {
     await sendMagicLink(email);
   };
 
+  interface PollResponse {
+    status: 'pending' | 'validated' | 'not_started';
+  }
+
+  const { data } = useQuery<PollResponse>({
+    queryKey: ["auth-status", email],
+    queryFn: () => pollAuth({ email }),
+    enabled: !!email && success, // Only run the query if email exists and success is true
+    refetchInterval: (query) => {
+      // Stop polling if we get a validated status
+      const data = query.state.data;
+      return data?.status === 'validated' ? false : 2000;
+    },
+  });
+
+  // Update UI when status changes to validated
   useEffect(() => {
-    if (success) {
-      const interval = setInterval(async () => {
-        const response = await pollAuthStatus(email);
-
-        console.log("response", response);
-
-        if (response.status === "validated") {
-          setShowClicked(true); // Mount <Clicked /> component
-          clearInterval(interval);
-        }
-      }, 2000);
-
-      return () => clearInterval(interval);
+    if (data?.status === 'validated') {
+      setShowClicked(true);
     }
-  }, [success]);
+  }, [data?.status]);
+
+  console.log("data", data);
+  console.log("showClicked", showClicked);
+
+  if (showClicked) {
+    return <Validated />;
+  }
 
   if (success) {
     return (
@@ -61,12 +74,6 @@ export default function AuthClient() {
         expiresIn={expiresIn}
       />
     );
-  }
-
-  console.log("showClicked", showClicked);
-
-  if (showClicked) {
-    return <Validated />;
   }
 
   return (
