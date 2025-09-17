@@ -22,6 +22,9 @@ export const authController = {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
 
+    // Set pending state when magic link is sent
+    await redisUtil.set(`auth:status:${email}`, "pending", 15 * 60); // 15 minutes TTL
+
     const result = await magicLinkService.requestMagicLink(email);
     return res.status(200).json({
       message: "Magic link sent!",
@@ -41,10 +44,20 @@ export const authController = {
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
+    // Set validated state - magic link clicked, waiting for device continuation
+    await redisUtil.set(
+      `auth:status:${payload.email}`,
+      "validated",
+      15 * 60 // 15 minutes TTL
+    );
+
     // ✅ Ensure user exists in DB
     let user = await prisma.user.findUnique({
       where: { email: payload.email },
     });
+
+    // Remove the token from Redis since it's been validated
+    await redisUtil.del(`auth:magiclink:${token}`);
 
     if (!user) {
       user = await prisma.user.create({
@@ -138,10 +151,14 @@ export const authController = {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
 
-      // 4️⃣ Clean up Redis
-      await redisUtil.del(sessionKey);
+      // Clean up Redis - auth is now complete
+      await Promise.all([
+        redisUtil.del(sessionKey),
+        // Clear the auth status - user is now fully authenticated
+        redisUtil.del(`auth:status:${user.email}`),
+      ]);
 
-      // ✅ Send user data in response
+      // Send user data in response
       return res.json({
         success: true,
         user: {
@@ -157,6 +174,22 @@ export const authController = {
       });
     } catch (err) {
       console.error("ContinueOnDevice error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+
+  async pollAuthStatus(req: Request, res: Response) {
+    const { email } = req.body;
+
+    try {
+      // Just check the auth status - simple!
+      const authStatus = await redisUtil.get(`auth:status:${email}`);
+
+      return res.json({
+        status: authStatus || "not_started", // "pending" | "validated" | "not_started"
+      });
+    } catch (err) {
+      console.error("Poll auth status error:", err);
       return res.status(500).json({ error: "Internal server error" });
     }
   },

@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { RefreshCw } from "lucide-react";
 import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth";
 import Check from "./check";
+import { useEffect, useState } from "react";
+import pollAuthStatus from "@/lib/poll-auth-status";
+import Validated from "./validated";
 
 export default function AuthClient() {
   const {
@@ -23,10 +26,29 @@ export default function AuthClient() {
     handleUseDifferentEmail,
   } = useMagicLinkAuth("http://localhost:4000/api/auth/magiclink");
 
+  const [showClicked, setShowClicked] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     await sendMagicLink(email);
   };
+
+  useEffect(() => {
+    if (success) {
+      const interval = setInterval(async () => {
+        const response = await pollAuthStatus(email);
+
+        console.log("response", response);
+
+        if (response.status === "validated") {
+          setShowClicked(true); // Mount <Clicked /> component
+          clearInterval(interval);
+        }
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [success]);
 
   if (success) {
     return (
@@ -39,6 +61,12 @@ export default function AuthClient() {
         expiresIn={expiresIn}
       />
     );
+  }
+
+  console.log("showClicked", showClicked);
+
+  if (showClicked) {
+    return <Validated />;
   }
 
   return (

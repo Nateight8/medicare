@@ -2,13 +2,13 @@ import { createClient } from "redis";
 
 // Create Redis client with connection options
 const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  url: process.env.REDIS_URL || "redis://localhost:6379",
   socket: {
     reconnectStrategy: (retries) => {
       console.log(`[Redis] Reconnecting, attempt ${retries + 1}`);
       return Math.min(retries * 100, 5000); // Reconnect with backoff, max 5s
-    }
-  }
+    },
+  },
 });
 
 // Log connection events
@@ -45,7 +45,11 @@ const connectRedis = async () => {
 connectRedis().catch(console.error);
 
 export const redisUtil = {
-  set: async (key: string, value: string, ttlInSeconds?: number): Promise<boolean> => {
+  set: async (
+    key: string,
+    value: string,
+    ttlInSeconds?: number
+  ): Promise<boolean> => {
     try {
       if (ttlInSeconds) {
         await redisClient.setEx(key, ttlInSeconds, value);
@@ -64,7 +68,10 @@ export const redisUtil = {
   get: async (key: string): Promise<string | null> => {
     try {
       const value = await redisClient.get(key);
-      console.log(`[Redis] Get key "${key}":`, value ? `"${value}"` : 'Not found');
+      console.log(
+        `[Redis] Get key "${key}":`,
+        value ? `"${value}"` : "Not found"
+      );
       return value;
     } catch (error) {
       console.error(`[Redis] Error getting key "${key}":`, error);
@@ -75,7 +82,10 @@ export const redisUtil = {
   del: async (key: string): Promise<boolean> => {
     try {
       const result = await redisClient.del(key);
-      console.log(`[Redis] Deleted key "${key}":`, result ? 'Success' : 'Key did not exist');
+      console.log(
+        `[Redis] Deleted key "${key}":`,
+        result ? "Success" : "Key did not exist"
+      );
       return result > 0;
     } catch (error) {
       console.error(`[Redis] Error deleting key "${key}":`, error);
@@ -86,7 +96,10 @@ export const redisUtil = {
   exists: async (key: string): Promise<boolean> => {
     try {
       const result = await redisClient.exists(key);
-      console.log(`[Redis] Check exists "${key}":`, result ? 'Exists' : 'Does not exist');
+      console.log(
+        `[Redis] Check exists "${key}":`,
+        result ? "Exists" : "Does not exist"
+      );
       return result === 1;
     } catch (error) {
       console.error(`[Redis] Error checking if key "${key}" exists:`, error);
@@ -96,15 +109,15 @@ export const redisUtil = {
 
   // Additional utility methods
   getClient: () => redisClient,
-  
+
   healthCheck: async (): Promise<boolean> => {
     try {
       await redisClient.ping();
-      console.log('[Redis] Health check: OK');
+      console.log("[Redis] Health check: OK");
       return true;
     } catch (error) {
-      console.error('[Redis] Health check failed:', error);
+      console.error("[Redis] Health check failed:", error);
       return false;
     }
-  }
+  },
 };
