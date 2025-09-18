@@ -35,9 +35,15 @@ export interface AuthenticatedRequest extends Request {
 
 export interface User extends PrismaUser {}
 
+export interface TokenValidationResult {
+  payload: TokenPayload | null;
+  error?: 'expired' | 'invalid' | 'used_or_revoked';
+}
+
 export interface MagicLinkService {
   requestMagicLink(email: string): Promise<{ expiresIn: string }>;
-  validateToken(token: string): Promise<TokenPayload | null>;
+  validateToken(token: string): Promise<TokenValidationResult>;
+  revokeMagicLink(email: string): Promise<boolean>;
 }
 
 export interface OTPService {

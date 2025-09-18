@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { sendMagicLink, pollAuth } from "@/lib/api";
+import { sendMagicLink, pollAuth, revokeAuth } from "@/lib/api";
 
 const STORAGE_KEY = "magicLinkState";
 const RESEND_COOLDOWN = 60; // 60 seconds
@@ -116,6 +116,13 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
     },
   });
 
+  // Revoke auth mutation
+  const revokeAuthMutation = useMutation({
+    mutationFn: async (email: string) => {
+      await revokeAuth({ email });
+    },
+  });
+
   const initAuth = authStatus?.status === "pending";
   const isAuthenticated = authStatus?.status === "validated";
 
@@ -138,6 +145,9 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
     setSavedState(null);
     setEmail("");
     setEmailError("");
+    if (savedState?.email) {
+      revokeAuthMutation.mutate(savedState.email);
+    }
   };
 
   // Clear error
@@ -145,10 +155,32 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
     setEmailError("");
   };
 
-  // Calculate time left
-  const timeLeft = savedState
-    ? Math.max(0, Math.floor((savedState.expiresAt - Date.now()) / 1000))
-    : 0;
+  // Time left state
+  const [timeLeft, setTimeLeft] = useState<number>(() => 
+    savedState ? Math.max(0, Math.floor((savedState.expiresAt - Date.now()) / 1000)) : 0
+  );
+
+  // Update time left every second
+  useEffect(() => {
+    if (!savedState) {
+      setTimeLeft(0);
+      return;
+    }
+
+    const updateTimeLeft = () => {
+      const newTimeLeft = Math.max(0, Math.floor((savedState.expiresAt - Date.now()) / 1000));
+      setTimeLeft(newTimeLeft);
+    };
+
+    // Update immediately
+    updateTimeLeft();
+
+    // Then update every second
+    const interval = setInterval(updateTimeLeft, 1000);
+    
+    // Clear interval on cleanup
+    return () => clearInterval(interval);
+  }, [savedState]);
 
   // Get resend cooldown
   const [resendCooldown, setResendCooldown] = useState(0);

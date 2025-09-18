@@ -79,15 +79,11 @@ export default function AuthClient() {
               effect="ringHover"
               className="w-full"
               disabled={isLoading}
+              loading={isLoading}
+              loadingIconPlacement="left"
+              loadingText="Sending magic link..."
             >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Sending magic link...
-                </>
-              ) : (
-                "Sign in with Email"
-              )}
+              Sign in with Email
             </Button>
 
             <div className="relative">
@@ -129,11 +125,17 @@ export default function AuthClient() {
 
             <p className="text-xs text-center text-muted-foreground">
               By signing in, you agree to our{" "}
-              <a href="/terms" className="underline hover:text-foreground">
+              <a
+                href="/terms"
+                className="underline hover:no-underline cursor-pointer font-semibold text-secondary"
+              >
                 Terms of Service
               </a>{" "}
               and{" "}
-              <a href="/privacy" className="underline hover:text-foreground">
+              <a
+                href="/privacy"
+                className="underline hover:no-underline cursor-pointer font-semibold text-secondary"
+              >
                 Privacy Policy
               </a>
               .

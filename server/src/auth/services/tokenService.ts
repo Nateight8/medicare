@@ -64,8 +64,15 @@ export class JWTTokenService implements TokenService {
       const decoded = await jwtVerify(token, this.secret);
       return decoded as TokenPayload;
     } catch (err) {
-      console.error("[JWTTokenService] Invalid or expired token:", err);
-      return null;
+      if (err instanceof jwt.TokenExpiredError) {
+        console.log("[JWTTokenService] Token has expired");
+        throw new Error('expired');
+      } else if (err instanceof jwt.JsonWebTokenError) {
+        console.error("[JWTTokenService] Invalid token:", err.message);
+        throw new Error('invalid');
+      }
+      console.error("[JWTTokenService] Error verifying token:", err);
+      throw new Error('invalid');
     }
   }
 }

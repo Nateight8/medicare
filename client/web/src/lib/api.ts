@@ -18,6 +18,11 @@ export const sendMagicLink = async ({ email }: SendMagicLinkParams) => {
   return response.data;
 };
 
+export const revokeAuth = async ({ email }: { email: string }) => {
+  const response = await apiClient.post("/auth/magiclink/revoke", { email });
+  return response.data;
+};
+
 export interface ContinueAuthResponse {
   success: boolean;
   user: {
@@ -32,7 +37,9 @@ export interface ContinueAuthResponse {
   };
 }
 
-export const continueAuth = async (requestId: string): Promise<ContinueAuthResponse> => {
+export const continueAuth = async (
+  requestId: string
+): Promise<ContinueAuthResponse> => {
   const response = await apiClient.post("/auth/continue", { requestId });
   return response.data;
 };

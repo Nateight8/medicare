@@ -120,4 +120,14 @@ export const redisUtil = {
       return false;
     }
   },
+  
+  ttl: async (key: string): Promise<number> => {
+    try {
+      const ttl = await redisClient.ttl(key);
+      return ttl;
+    } catch (error) {
+      console.error(`[Redis] Error getting TTL for key ${key}:`, error);
+      return -2; // Returns -2 if the key doesn't exist (standard Redis behavior)
+    }
+  },
 };

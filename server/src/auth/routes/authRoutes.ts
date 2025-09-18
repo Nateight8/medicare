@@ -6,6 +6,7 @@ const router = Router();
 
 router.post("/magiclink", authController.sendMagicLink);
 router.get("/magiclink/validate", authController.validateMagicLink);
+router.post("/magiclink/revoke", authController.revokeAuth);
 router.get("/auth/qr", qrController.generateQRCode);
 router.post("/auth/continue", authController.continueOnDevice);
 router.post("/refresh-token", authController.refreshToken);

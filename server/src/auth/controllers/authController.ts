@@ -22,70 +22,144 @@ export const authController = {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    // Set pending state when magic link is sent
-    await redisUtil.set(`auth:status:${email}`, "pending", 15 * 60); // 15 minutes TTL
+    try {
+      // Set pending state when magic link is sent
+      await redisUtil.set(`auth:status:${email}`, "pending", 15 * 60); // 15 minutes TTL
 
-    const result = await magicLinkService.requestMagicLink(email);
-    return res.status(200).json({
-      message: "Magic link sent!",
-      success: true,
-      expiresIn: result.expiresIn,
-    });
+      const result = await magicLinkService.requestMagicLink(email);
+      return res.status(200).json({
+        message: "Magic link sent!",
+        success: true,
+        expiresIn: result.expiresIn,
+      });
+    } catch (error) {
+      console.error("[AuthController] Error sending magic link:", error);
+      return res.status(500).json({
+        error: "Failed to send magic link",
+        success: false,
+      });
+    }
+  },
+
+  async revokeAuth(req: Request, res: Response) {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    try {
+      // Use the service method to properly revoke all magic links for this email
+      const revoked = await magicLinkService.revokeMagicLink(email);
+
+      // Also clear the pending status
+      await redisUtil.del(`auth:status:${email}`);
+
+      return res.status(200).json({
+        message: revoked ? "Magic link revoked!" : "No active magic link found",
+        success: true,
+        revoked,
+      });
+    } catch (error) {
+      console.error("[AuthController] Error revoking magic link:", error);
+      return res.status(500).json({
+        error: "Failed to revoke magic link",
+        success: false,
+      });
+    }
   },
 
   async validateMagicLink(req: Request, res: Response) {
     const { token } = req.query;
     if (typeof token !== "string") {
-      return res.status(400).json({ error: "Invalid token" });
-    }
-
-    const payload = await magicLinkService.validateToken(token);
-    if (!payload) {
-      return res.status(401).json({ error: "Invalid or expired token" });
-    }
-
-    // Set validated state - magic link clicked, waiting for device continuation
-    await redisUtil.set(
-      `auth:status:${payload.email}`,
-      "validated",
-      15 * 60 // 15 minutes TTL
-    );
-
-    // ✅ Ensure user exists in DB
-    let user = await prisma.user.findUnique({
-      where: { email: payload.email },
-    });
-
-    // Remove the token from Redis since it's been validated
-    await redisUtil.del(`auth:magiclink:${token}`);
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: payload.email,
-        },
-      });
-    }
-
-    // Detect device type
-    const ua = req.headers["user-agent"] || "";
-    const agent = parse(ua);
-    const isMobile = agent.device?.toString().toLowerCase().includes("mobile");
-
-    if (isMobile) {
-      // Mobile deep link
       return res.redirect(
-        `yourapp://auth/verify?token=${encodeURIComponent(token)}`
+        `${process.env.WEB_APP_URL}/auth/error?reason=invalid_token`
       );
     }
 
-    // Desktop QR fallback — store userId instead of email
-    const requestId = await magicLinkService.storeAuthRequest(user.id);
-    return res.redirect(
-      `${process.env.WEB_APP_URL}/auth/qr?requestId=${encodeURIComponent(
-        requestId
-      )}`
-    );
+    try {
+      const { payload, error } = await magicLinkService.validateToken(token);
+
+      if (error === 'expired') {
+        return res.redirect(
+          `${process.env.WEB_APP_URL}/auth/error?reason=expired_token`
+        );
+      }
+
+      if (error === 'used_or_revoked') {
+        return res.redirect(
+          `${process.env.WEB_APP_URL}/auth/error?reason=used_token`
+        );
+      }
+
+      if (error === 'invalid' || !payload) {
+        return res.redirect(
+          `${process.env.WEB_APP_URL}/auth/error?reason=invalid_token`
+        );
+      }
+
+      // Set validated state - magic link clicked, waiting for device continuation
+      await redisUtil.set(
+        `auth:status:${payload.email}`,
+        "validated",
+        15 * 60 // 15 minutes TTL
+      );
+
+      // ✅ Ensure user exists in DB
+      let user = await prisma.user.findUnique({
+        where: { email: payload.email },
+      });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: payload.email,
+          },
+        });
+      }
+
+      // Detect device type
+      const ua = req.headers["user-agent"] || "";
+      const agent = parse(ua);
+      const isMobile = agent.device
+        ?.toString()
+        .toLowerCase()
+        .includes("mobile");
+
+      if (isMobile) {
+        // Mobile deep link
+        return res.redirect(
+          `yourapp://auth/verify?token=${encodeURIComponent(token)}`
+        );
+      }
+
+      // Desktop QR fallback — store userId instead of email
+      const requestId = await magicLinkService.storeAuthRequest(user.id);
+      return res.redirect(
+        `${process.env.WEB_APP_URL}/auth/qr?requestId=${encodeURIComponent(
+          requestId
+        )}`
+      );
+    } catch (error) {
+      console.error("[AuthController] Error validating magic link:", error);
+      return res.status(500).json({
+        error: "Failed to validate token",
+        success: false,
+      });
+    }
+  },
+
+  async pollAuthStatus(req: Request, res: Response) {
+    const { email } = req.body;
+
+    try {
+      // Just check the auth status - simple!
+      const authStatus = await redisUtil.get(`auth:status:${email}`);
+
+      return res.json({
+        status: authStatus || "not_started", // "pending" | "validated" | "not_started"
+      });
+    } catch (err) {
+      console.error("Poll auth status error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
   },
 
   async continueOnDevice(req: Request, res: Response) {
@@ -178,22 +252,6 @@ export const authController = {
     }
   },
 
-  async pollAuthStatus(req: Request, res: Response) {
-    const { email } = req.body;
-
-    try {
-      // Just check the auth status - simple!
-      const authStatus = await redisUtil.get(`auth:status:${email}`);
-
-      return res.json({
-        status: authStatus || "not_started", // "pending" | "validated" | "not_started"
-      });
-    } catch (err) {
-      console.error("Poll auth status error:", err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  },
-
   async refreshToken(req: Request, res: Response) {
     try {
       const refreshTokenValue = req.cookies?.refresh_token;
@@ -269,6 +327,29 @@ export const authController = {
     } catch (err) {
       console.error("Refresh token error:", err);
       return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+
+  async getAuthStatus(req: Request, res: Response) {
+    const { email } = req.query;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const status = await redisUtil.get(`auth:status:${email}`);
+
+      return res.status(200).json({
+        status: status || "not_started",
+        success: true,
+      });
+    } catch (error) {
+      console.error("[AuthController] Error getting auth status:", error);
+      return res.status(500).json({
+        error: "Failed to get auth status",
+        success: false,
+      });
     }
   },
 };
