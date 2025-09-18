@@ -12,7 +12,7 @@ import Validated from "./validated";
 export default function AuthClient() {
   const {
     email,
-    success,
+    initAuth,
     emailError,
     isLoading,
     timeLeft,
@@ -34,7 +34,7 @@ export default function AuthClient() {
     return <Validated />;
   }
 
-  if (success) {
+  if (initAuth) {
     return (
       <Check
         email={email}

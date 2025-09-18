@@ -12,13 +12,13 @@ interface MagicLinkState {
 }
 
 interface AuthStatusResponse {
-  status: 'pending' | 'validated' | 'not_started';
+  status: "pending" | "validated" | "not_started";
 }
 
 interface UseMagicLinkAuthReturn {
   // State
   email: string;
-  success: boolean;
+  initAuth: boolean;
   emailError: string;
   isLoading: boolean;
   timeLeft: number;
@@ -82,46 +82,53 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
     mutationFn: async (emailToSend: string) => {
       setEmailError("");
       const response = await sendMagicLink({ email: emailToSend });
-      
+
       // Save state to session storage
       const expiresInMs = parseDuration(response.expiresIn || "15m");
       const expiresAt = Date.now() + expiresInMs;
       const state = {
         email: emailToSend,
         expiresAt,
-        expiresIn: response.expiresIn || "15m"
+        expiresIn: response.expiresIn || "15m",
       };
-      
+
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       setSavedState(state);
-      
+
       return state;
     },
     onError: (error: Error) => {
       setEmailError(error.message || "Failed to send magic link");
-    }
+    },
   });
 
   // Poll auth status
   const { data: authStatus } = useQuery<AuthStatusResponse>({
     queryKey: ["auth-status", savedState?.email],
-    queryFn: () => pollAuth({ email: savedState?.email || '' }) as Promise<AuthStatusResponse>,
+    queryFn: () =>
+      pollAuth({
+        email: savedState?.email || "",
+      }) as Promise<AuthStatusResponse>,
     enabled: !!savedState?.email,
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      // Stop polling if the status is validated
+      return query.state.data?.status === "validated" ? false : 2000;
+    },
   });
 
-  const isAuthenticated = authStatus?.status === 'validated';
+  const initAuth = authStatus?.status === "pending";
+  const isAuthenticated = authStatus?.status === "validated";
 
   // Handle resend
   const handleResend = async () => {
     if (!savedState?.email || sendMagicLinkMutation.isPending) return;
-    
+
     // Set cooldown
     sessionStorage.setItem(
       `${STORAGE_KEY}:cooldown`,
       (Date.now() + RESEND_COOLDOWN * 1000).toString()
     );
-    
+
     await sendMagicLinkMutation.mutateAsync(savedState.email);
   };
 
@@ -143,18 +150,17 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
     ? Math.max(0, Math.floor((savedState.expiresAt - Date.now()) / 1000))
     : 0;
 
-  // Check if the link is still valid
-  const success = !!savedState && timeLeft > 0;
-
   // Get resend cooldown
   const [resendCooldown, setResendCooldown] = useState(0);
-  
+
   // Update resend cooldown
   useEffect(() => {
     const updateCooldown = () => {
       const cooldown = sessionStorage.getItem(`${STORAGE_KEY}:cooldown`);
       if (cooldown) {
-        const remaining = Math.ceil((parseInt(cooldown, 10) - Date.now()) / 1000);
+        const remaining = Math.ceil(
+          (parseInt(cooldown, 10) - Date.now()) / 1000
+        );
         setResendCooldown(Math.max(0, remaining));
       } else {
         setResendCooldown(0);
@@ -168,9 +174,9 @@ export function useMagicLinkAuth(): UseMagicLinkAuthReturn {
 
   return {
     email,
-    success,
+    initAuth,
     emailError,
-    isLoading: sendMagicLinkMutation.status === 'pending',
+    isLoading: sendMagicLinkMutation.status === "pending",
     timeLeft,
     resendCooldown,
     expiresIn: savedState?.expiresIn || "15m",

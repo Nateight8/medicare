@@ -2,20 +2,9 @@
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-
-interface ContinueResponse {
-  success: boolean;
-  user: {
-    id: string;
-    email: string;
-    phone: string;
-    name: string;
-    timeZone: string;
-    createdAt: string;
-    updatedAt: string;
-    onboarded: boolean;
-  };
-}
+import { useMutation } from "@tanstack/react-query";
+import { continueAuth } from "@/lib/api";
+import Image from "next/image";
 
 export default function Page() {
   const searchParams = useSearchParams();
@@ -43,34 +32,25 @@ export default function Page() {
 
   const channel = new BroadcastChannel("auth");
 
-  const handleContinue = async () => {
-    if (!requestId) return;
-    // setLoading(true);
-
-    try {
-      const res = await fetch("http://localhost:4000/api/auth/continue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId }),
-        credentials: "include", // important for cookies
-      });
-
-      if (!res.ok) throw new Error("Continue failed");
-
-      const data: ContinueResponse = await res.json();
-
-      if (data.user.onboarded === true) {
-        channel.postMessage("logged_in");
+  const continueMutation = useMutation({
+    mutationFn: (requestId: string) => continueAuth(requestId),
+    onSuccess: (data) => {
+      if (data.user.onboarded) {
+        channel.postMessage("onboarded");
         window.location.href = "/";
       } else {
         channel.postMessage("onboard");
         window.location.href = "/onboard";
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      // setLoading(false);
-    }
+    },
+    onError: (error) => {
+      console.error("Continue failed:", error);
+    },
+  });
+
+  const handleContinue = () => {
+    if (!requestId) return;
+    continueMutation.mutate(requestId);
   };
 
   return (
@@ -79,9 +59,11 @@ export default function Page() {
         <div className="flex flex-col gap-6 md:p-6">
           <div className="flex flex-col items-center gap-2">
             {qrCode ? (
-              <img
+              <Image
                 src={qrCode}
                 alt="QR Code"
+                width={200}
+                height={200}
                 className="h-48 w-48 object-contain"
               />
             ) : (
