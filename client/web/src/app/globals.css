@@ -169,6 +169,7 @@
 @theme {
   --animate-shine: shine 3s ease-out infinite;
   --animate-gradient-flow: gradientFlow 10s ease 0s infinite normal none running;
+  --animate-spinner-leaf-fade: spinner-leaf-fade 800ms linear infinite;
 }
 
 @keyframes shine {
@@ -192,6 +193,18 @@
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+@keyframes spinner-leaf-fade {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
   }
 }
 

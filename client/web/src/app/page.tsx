@@ -25,11 +25,13 @@ export default function Home() {
   return (
     <div className="h-screen flex-col gap-4 w-full flex items-center justify-center">
       {/* <QrWrapper /> */}
-      <Button onClick={() => logout()}>Logout</Button>
+      <Button effect="ringHover" onClick={() => logout()}>
+        Logout
+      </Button>
       <EditProfileDialog />
 
       <ThemeToggle />
-      <Button effect="gooeyLeft" variant="default">
+      <Button loading={true} effect="gooeyLeft" variant="default">
         Gooey Left
       </Button>
       <div className="animate-gradient-flow bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">
