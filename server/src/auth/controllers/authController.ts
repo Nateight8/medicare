@@ -95,6 +95,9 @@ export const authController = {
         );
       }
 
+      // Immediately delete the token to prevent multiple uses
+      await redisUtil.del(`auth:magiclink:${token}`);
+      
       // Set validated state - magic link clicked, waiting for device continuation
       await redisUtil.set(
         `auth:status:${payload.email}`,

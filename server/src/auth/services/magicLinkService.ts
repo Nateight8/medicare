@@ -190,11 +190,9 @@ export class MagicLinkServiceImpl implements MagicLinkService {
         return { payload: null, error: 'expired' };
       }
 
-      // Mark token as used and update last used timestamp
-      tokenData.status = 'used';
-      tokenData.lastUsedAt = now;
-      await redisUtil.set(redisKey, JSON.stringify(tokenData), 60); // Keep used token for 1 minute before cleanup
-
+      // Immediately remove the token to prevent multiple uses
+      await redisUtil.del(redisKey);
+      
       // Remove token from email mapping
       await this.removeTokenFromEmailMapping(payload.email, token);
 
