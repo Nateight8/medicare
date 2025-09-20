@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import InfoCard from "./_component/info-card";
 
 // Reusable Care Circle List
 function CareCircleList() {
@@ -90,7 +91,7 @@ export default function ProfilePage() {
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Profile Header */}
-        <div className="rounded-xl shadow-sm p-6 flex flex-col items-center space-y-4">
+        <div className="p-6 flex flex-col items-center space-y-4">
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center overflow-hidden">
               <User className="w-12 h-12 text-background" />
@@ -106,42 +107,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Personal Information */}
-        <div className="rounded-xl overflow-hidden shadow-sm bg-muted/50">
-          <div className="p-4 border-b">
-            <h3 className="font-medium">Personal Information</h3>
-          </div>
-          <div className="divide-y">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center space-x-3">
-                <Phone className="w-5 h-5" />
-                <div>
-                  <p className="text-sm font-medium">Phone Number</p>
-                  <p className="text-sm text-muted-foreground">
-                    +1 (555) 123-4567
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center space-x-3">
-                <Calendar className="w-5 h-5" />
-                <div>
-                  <p className="text-sm font-medium">Date of Birth</p>
-                  <p className="text-sm text-muted-foreground">
-                    March 15, 1985
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button className="flex items-center justify-between w-full p-4 hover:bg-muted transition-colors">
-              <div className="flex items-center space-x-3">
-                <FileHeart className="w-5 h-5" />
-                <span className="text-sm font-medium">Medical Profile</span>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <InfoCard />
 
         {/* Emergency Contact */}
         <div className="rounded-xl overflow-hidden shadow-sm bg-muted/50">

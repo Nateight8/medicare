@@ -4,7 +4,6 @@ import type React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw } from "lucide-react";
 import { useMagicLinkAuth } from "@/hooks/use-magiclink-auth-query";
 import Check from "./check";
 import Validated from "./validated";
@@ -77,7 +76,7 @@ export default function AuthClient() {
               type="submit"
               size="lg"
               effect="ringHover"
-              className="w-full"
+              className="w-full "
               disabled={isLoading}
               loading={isLoading}
               loadingIconPlacement="left"

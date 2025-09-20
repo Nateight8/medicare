@@ -92,6 +92,9 @@ export default function Page() {
               size="lg"
               type="button"
               className="w-full "
+              disabled={continueMutation.isPending}
+              loading={continueMutation.isPending}
+              loadingText="Redirecting..."
               onClick={handleContinue}
             >
               Continue on this device
