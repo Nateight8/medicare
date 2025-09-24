@@ -127,24 +127,13 @@ router.get(
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
 
-      // Get the return URL from session or use default
-      const returnTo = req.session?.returnTo || '/';
-      if (req.session) {
-        // Clear the returnTo from session
-        delete req.session.returnTo;
+      // Check if user needs to complete onboarding
+      if (!user.onboarded) {
+        return res.redirect('http://localhost:3000/onboarding');
       }
 
-      // Redirect to frontend with tokens in URL
-      const redirectUrl = new URL('http://localhost:3000/auth/callback');
-      redirectUrl.searchParams.set('token', accessToken);
-      redirectUrl.searchParams.set('refreshToken', refreshTokenValue);
-      
-      // If we have a returnTo path, append it to the redirect URL
-      if (returnTo && returnTo !== '/') {
-        redirectUrl.searchParams.set('returnTo', returnTo);
-      }
-      
-      return res.redirect(redirectUrl.toString());
+      // Redirect onboarded users to the root path
+      return res.redirect('http://localhost:3000/');
     } catch (error) {
       console.error("[OAuth Callback Error]:", error);
       return res.redirect('http://localhost:3000/login?error=oauth_failed');
