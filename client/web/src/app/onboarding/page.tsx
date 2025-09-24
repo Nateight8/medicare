@@ -43,7 +43,7 @@ const formSchema = z.object({
   displayName: z.string(),
   image: z.string().optional(),
   age: z.number(),
-  dateOfBirth: z.date().optional(),
+  // dateOfBirth: z.date().optional(),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -110,17 +110,16 @@ export default function Page() {
     updateUserProfile({
       variables: {
         input: {
-          name: values.displayName, // Use displayName as the name for onboarding
           displayName: values.displayName,
-          age: values.age,
-          image: values.image,
+          // age: values.age,
+          // image: values.image,
         },
       },
     });
   };
 
   const [step, setStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 3;
 
   const nextStep = () => {
     setStep((prev) => prev + 1);
@@ -160,7 +159,7 @@ export default function Page() {
         {/* content */}
         {step === 1 && <AvatarUpload />}
         {step === 2 && <DisplayName form={form} />}
-        {step === 3 && (
+        {step === 5 && (
           <AgeWheelPicker
             form={form}
             options={options}
@@ -168,7 +167,7 @@ export default function Page() {
             yearOptions={yearOptions}
           />
         )}
-        {step >= 4 && <Preview form={form} />}
+        {step >= 3 && <Preview form={form} />}
 
         {/* footer */}
         <div className="flex flex-col gap-2 w-full max-w-md mx-auto md:h-64 md:px-14 ">
@@ -329,7 +328,7 @@ function AgeWheelPicker({
 
     // Update both age and date of birth in the form
     form.setValue("age", age);
-    form.setValue("dateOfBirth", birthDate);
+    // form.setValue("dateOfBirth", birthDate);
   };
 
   // Initialize with current date on component mount
@@ -340,7 +339,7 @@ function AgeWheelPicker({
     setSelectedYear(today.getFullYear());
 
     // Set initial date of birth in the form
-    form.setValue("dateOfBirth", today);
+    // form.setValue("dateOfBirth", today);
 
     // Calculate initial age
     updateFormAge(today.getDate(), today.getMonth() + 1, today.getFullYear());

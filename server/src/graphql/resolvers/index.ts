@@ -1,6 +1,6 @@
 import _ from "lodash";
-import { authResolvers } from "./auth.resolvers";
-import { prescriptionResolvers } from "./prescription.resolvers";
+import { userResolvers } from "./user";
+import { prescriptionResolvers } from "./prescription";
 
 // Merge all resolvers
-export const resolvers = _.merge(authResolvers, prescriptionResolvers);
+export const resolvers = _.merge(userResolvers, prescriptionResolvers);

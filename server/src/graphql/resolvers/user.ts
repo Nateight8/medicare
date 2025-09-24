@@ -1,11 +1,11 @@
 import { GraphQLError } from "graphql";
 import { isValidIANA } from "@/graphql/utils/time-zone"; // <-- helper for time zone validation
 import { GraphqlContext } from "../context";
-import { UpdateProfileInput } from "../typedefs/auth.types";
+import { UpdateProfileInput } from "../typedefs/user";
 import { redisUtil } from "@/lib/redis";
 import { createHash } from "crypto";
 
-export const authResolvers = {
+export const userResolvers = {
   Query: {
     me: async (_: any, __: any, ctx: GraphqlContext) => {
       const { user } = ctx;
@@ -52,7 +52,7 @@ export const authResolvers = {
         });
       }
 
-      const { name, phone, timeZone, age, displayName, image } = input;
+      const { displayName, phone, timeZone, dateOfBirth, image } = input;
 
       if (timeZone && !isValidIANA(timeZone)) {
         throw new GraphQLError("Invalid timeZone", {
@@ -71,16 +71,23 @@ export const authResolvers = {
         });
       }
 
+      // Only include fields that are provided in the input
       const data: Record<string, any> = {};
-      if (name !== undefined) data.name = name;
+
+      // Basic profile information
+      if (displayName !== undefined) data.displayName = displayName;
       if (phone !== undefined) data.phone = phone;
       if (timeZone !== undefined) data.timeZone = timeZone;
+
+      // User preferences and display settings
       if (displayName !== undefined) data.displayName = displayName;
-      if (age !== undefined) data.age = age;
       if (image !== undefined) data.image = image;
 
+      // Parse date string to Date object for database storage
+      if (dateOfBirth !== undefined) data.dateOfBirth = new Date(dateOfBirth);
+
       // Mark as onboarded if name is provided and it's not yet true
-      if (!existingUser.onboarded && name) {
+      if (!existingUser.onboarded && displayName) {
         data.onboarded = true;
       }
 
@@ -92,14 +99,23 @@ export const authResolvers = {
 
         return { success: true };
       } catch (e: any) {
+        console.error("Update profile error:", e);
         if (e?.code === "P2002") {
           const field = e?.meta?.target?.[0] ?? "field";
           throw new GraphQLError(`${field} already in use`, {
-            extensions: { code: "BAD_USER_INPUT" },
+            extensions: { 
+              code: "BAD_USER_INPUT",
+              details: e.message,
+              meta: e.meta
+            },
           });
         }
-        throw new GraphQLError("Failed to update profile", {
-          extensions: { code: "INTERNAL_SERVER_ERROR" },
+        throw new GraphQLError(e.message || "Failed to update profile", {
+          extensions: { 
+            code: "INTERNAL_SERVER_ERROR",
+            details: e.message,
+            stack: process.env.NODE_ENV === 'development' ? e.stack : undefined
+          },
         });
       }
     },
