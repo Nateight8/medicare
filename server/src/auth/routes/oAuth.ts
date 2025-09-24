@@ -41,7 +41,7 @@ router.get("/google", async (req, res, next) => {
     return passport.authenticate("google", {
       scope: ["profile", "email"],
       session: false,
-      failureRedirect: "http://localhost:3000/login?error=oauth_failed"
+      failureRedirect: `${process.env.CORS_ORIGIN}/login?error=oauth_failed`,
     })(req, res, next);
   } catch (error) {
     console.error("Rate limit exceeded for Google OAuth:", error);
@@ -56,19 +56,25 @@ router.get(
   "/google/callback",
   (req, res, next) => {
     // Handle the Google OAuth callback
-    passport.authenticate('google', {
-      session: false,
-      failureRedirect: 'http://localhost:3000/login?error=oauth_failed'
-    }, (error: any, user: any, info: any) => {
-      if (error || !user) {
-        console.error('Google OAuth error:', error || info);
-        return res.redirect('http://localhost:3000/login?error=oauth_failed');
+    passport.authenticate(
+      "google",
+      {
+        session: false,
+        failureRedirect: `${process.env.CORS_ORIGIN}/login?error=oauth_failed`,
+      },
+      (error: any, user: any, info: any) => {
+        if (error || !user) {
+          console.error("Google OAuth error:", error || info);
+          return res.redirect(
+            `${process.env.CORS_ORIGIN}/login?error=oauth_failed`
+          );
+        }
+
+        // Attach user to request for the next middleware
+        req.user = user;
+        next();
       }
-      
-      // Attach user to request for the next middleware
-      req.user = user;
-      next();
-    })(req, res, next);
+    )(req, res, next);
   },
   async (req, res) => {
     try {
@@ -129,14 +135,16 @@ router.get(
 
       // Check if user needs to complete onboarding
       if (!user.onboarded) {
-        return res.redirect('http://localhost:3000/onboarding');
+        return res.redirect(`${process.env.CORS_ORIGIN}/onboarding`);
       }
 
       // Redirect onboarded users to the root path
-      return res.redirect('http://localhost:3000/');
+      return res.redirect(`${process.env.CORS_ORIGIN}/`);
     } catch (error) {
       console.error("[OAuth Callback Error]:", error);
-      return res.redirect('http://localhost:3000/login?error=oauth_failed');
+      return res.redirect(
+        `${process.env.CORS_ORIGIN}/login?error=oauth_failed`
+      );
     }
   }
 );

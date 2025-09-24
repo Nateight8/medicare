@@ -47,7 +47,7 @@ export const configureGoogleStrategy = () => {
       {
         clientID: process.env.GOOGLE_CLIENT_ID!,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-        callbackURL: `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/auth/google/callback`,
+        callbackURL: `${process.env.API_URL}/api/auth/google/callback`,
         passReqToCallback: true,
         scope: ["profile", "email"],
       },
