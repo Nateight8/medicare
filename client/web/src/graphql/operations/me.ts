@@ -19,6 +19,15 @@ export const meOperation = {
         }
       }
     `,
+
+    deleteAccount: gql`
+      mutation DeleteAccount {
+        deleteAccount {
+          success
+        }
+      }
+    `,
+
     logout: gql`
       mutation Logout {
         logout {
