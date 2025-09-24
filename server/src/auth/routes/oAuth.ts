@@ -1,0 +1,155 @@
+import { Router } from "express";
+import passport from "passport";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+// No need for @types/rate-limiter-flexible as types are included
+import { redisUtil } from "@/lib/redis";
+import { User } from "@prisma/client";
+import { MagicLinkServiceImpl } from "../services/magicLinkService";
+
+import { addDays } from "date-fns";
+import crypto from "crypto";
+import prisma from "@/lib/prisma";
+
+const magicLinkService = new MagicLinkServiceImpl({
+  magicLinkBaseUrl:
+    process.env.BACKEND_URL ||
+    "http://localhost:4000/api/auth/magiclink/validate",
+  jwtSecret: process.env.JWT_SECRET || "your-secret-key",
+  tokenExpiry: "5m",
+  redisPrefix: "auth:",
+});
+
+const router = Router();
+
+// Rate limiting
+const rateLimiter = new RateLimiterMemory({
+  points: 5, // 5 requests
+  duration: 15 * 60, // per 15 minutes
+});
+
+// --- 1. Start Google OAuth login ---
+router.get("/google", async (req, res, next) => {
+  try {
+    await rateLimiter.consume(req.ip ?? "unknown-ip");
+
+    // Store any state or return URL before authentication
+    if (req.query.returnTo) {
+      req.session.returnTo = req.query.returnTo as string;
+    }
+
+    // Initialize authentication with Google
+    return passport.authenticate("google", {
+      scope: ["profile", "email"],
+      session: false,
+      failureRedirect: "http://localhost:3000/login?error=oauth_failed"
+    })(req, res, next);
+  } catch (error) {
+    console.error("Rate limit exceeded for Google OAuth:", error);
+    return res
+      .status(429)
+      .json({ error: "Too many requests. Please try again later." });
+  }
+});
+
+// --- 2. Google OAuth callback ---
+router.get(
+  "/google/callback",
+  (req, res, next) => {
+    // Handle the Google OAuth callback
+    passport.authenticate('google', {
+      session: false,
+      failureRedirect: 'http://localhost:3000/login?error=oauth_failed'
+    }, (error: any, user: any, info: any) => {
+      if (error || !user) {
+        console.error('Google OAuth error:', error || info);
+        return res.redirect('http://localhost:3000/login?error=oauth_failed');
+      }
+      
+      // Attach user to request for the next middleware
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
+  async (req, res) => {
+    try {
+      const user = req.user as User & { id: string };
+      if (!user) {
+        throw new Error("No user returned from OAuth");
+      }
+
+      // Check for pending Magic Link validation
+      if (redisUtil) {
+        const validatedState = await redisUtil.get(`auth:status:${user.email}`);
+        if (validatedState === "validated") {
+          await redisUtil.del(`auth:status:${user.email}`);
+        }
+      }
+
+      // Generate access token (same as magic link)
+      const payload = {
+        userId: user.id,
+        email: user.email,
+        type: "oauth",
+      };
+
+      const accessToken = await (magicLinkService as any)[
+        "tokenService"
+      ].generateToken(payload, { expiresIn: process.env.JWT_EXPIRY || "1h" });
+
+      // Generate refresh token
+      const refreshTokenValue = crypto.randomBytes(32).toString("hex");
+      const refreshTokenHash = crypto
+        .createHash("sha256")
+        .update(refreshTokenValue)
+        .digest("hex");
+
+      // Store refresh token in database
+      await prisma.refreshToken.create({
+        data: {
+          tokenHash: refreshTokenHash,
+          userId: user.id,
+          expiresAt: addDays(new Date(), 30),
+        },
+      });
+
+      // Set HTTP-only cookies
+      res.cookie("auth_token", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 3600 * 1000, // 1h
+      });
+
+      res.cookie("refresh_token", refreshTokenValue, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      // Get the return URL from session or use default
+      const returnTo = req.session?.returnTo || '/';
+      if (req.session) {
+        // Clear the returnTo from session
+        delete req.session.returnTo;
+      }
+
+      // Redirect to frontend with tokens in URL
+      const redirectUrl = new URL('http://localhost:3000/auth/callback');
+      redirectUrl.searchParams.set('token', accessToken);
+      redirectUrl.searchParams.set('refreshToken', refreshTokenValue);
+      
+      // If we have a returnTo path, append it to the redirect URL
+      if (returnTo && returnTo !== '/') {
+        redirectUrl.searchParams.set('returnTo', returnTo);
+      }
+      
+      return res.redirect(redirectUrl.toString());
+    } catch (error) {
+      console.error("[OAuth Callback Error]:", error);
+      return res.redirect('http://localhost:3000/login?error=oauth_failed');
+    }
+  }
+);
+
+export default router;

@@ -99,7 +99,11 @@ export default function AuthClient() {
               effect="ringHover"
               type="button"
               variant="outline"
-              className="w-full "
+              className="w-full"
+              onClick={() => {
+                const baseUrl = process.env.NEXT_PUBLIC_GRAPHQL_URI?.replace(/\/graphql$/, '') || 'http://localhost:4000';
+                window.location.href = `${baseUrl}/api/auth/google`;
+              }}
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path

@@ -37,7 +37,7 @@
       "@/utils/*": ["utils/*"]
     }
   },
-  "include": ["src/**/*", "drizzle.config.ts"],
+  "include": ["src/**/*", "drizzle.config.ts", "src/types"],
   "exclude": ["node_modules", "dist", "drizzle"],
   "ts-node": {
     "esm": true,

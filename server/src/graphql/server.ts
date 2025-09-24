@@ -5,6 +5,11 @@ import cookieParser from "cookie-parser";
 import { ApolloServer } from "@apollo/server";
 import { expressMiddleware } from "@as-integrations/express4";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
+// Import and configure Passport
+import passport, { configureGoogleStrategy } from "@/auth/passport";
+
+// Configure Passport strategies
+configureGoogleStrategy();
 
 import { typeDefs } from "./typedefs";
 import { resolvers } from "./resolvers";
@@ -12,7 +17,8 @@ import { createContext } from "./context";
 import { JWTTokenService } from "@/auth/services/tokenService";
 import prisma from "@/lib/prisma";
 
-import authRoutes from "@/auth/routes/authRoutes";
+import authRoutes from "@/auth/routes/mAuth";
+import oauthRoutes from "@/auth/routes/oAuth";
 
 export async function createServer() {
   const app = express();
@@ -27,8 +33,14 @@ export async function createServer() {
   app.use(express.json());
   app.use(cookieParser());
 
+  // Initialize Passport
+  app.use(passport.initialize());
+
   // Mount auth routes under /api prefix
   app.use("/api", authRoutes);
+
+  // Mount OAuth routes under /api/auth prefix
+  app.use("/api/auth", oauthRoutes);
 
   const tokenService = new JWTTokenService({
     jwtSecret: process.env.JWT_SECRET || "your-secret-key",
