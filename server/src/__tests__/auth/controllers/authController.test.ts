@@ -21,6 +21,9 @@ const mockStoreAuthRequest = jest.fn();
 import { authController } from "../../../../src/auth/controllers/authController";
 import { redisUtil } from "../../../../src/lib/redis";
 import { MagicLinkServiceImpl } from "../../../../src/auth/services/magicLinkService";
+
+// Declare magicLinkService variable
+let magicLinkService: jest.Mocked<MagicLinkServiceImpl>;
 import prisma from "../../../../src/lib/prisma";
 
 // ---- Mock Redis ----
@@ -39,6 +42,9 @@ jest.mock("../../../../src/auth/services/magicLinkService", () => ({
     revokeMagicLink: mockRevokeMagicLink,
     validateToken: mockValidateToken,
     storeAuthRequest: mockStoreAuthRequest,
+    tokenService: {
+      generateToken: jest.fn().mockResolvedValue("mock-token"),
+    },
   })),
 }));
 
@@ -297,4 +303,115 @@ describe("authController", () => {
   // ---------------------------
   // continueOnDevice
   // ---------------------------
+  describe("continueOnDevice", () => {
+    it("should return 400 if no requestId is provided", async () => {
+      req.body = {}; // no requestId
+
+      await authController.continueOnDevice(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Missing or invalid requestId",
+      });
+    });
+
+    it("should return 400 if request not found in redis", async () => {
+      req.body = { requestId: "req-123" };
+      (redisUtil.get as jest.Mock).mockResolvedValue(null);
+
+      await authController.continueOnDevice(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith("auth:qr:req-123");
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Invalid or expired session",
+      });
+    });
+
+    it("should return 404 if user not found in database", async () => {
+      req.body = { requestId: "req-123" };
+      (redisUtil.get as jest.Mock).mockResolvedValue("user-123");
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await authController.continueOnDevice(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith("auth:qr:req-123");
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "user-123" },
+      });
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "User not found",
+      });
+    });
+
+    it("should return success with user data if validation passes", async () => {
+      const mockUser = {
+        id: "u-123",
+        email: "test@example.com",
+        phone: "1234567890",
+        name: "Test User",
+        timeZone: "UTC",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        onboarded: false,
+      };
+
+      req.body = { requestId: "req-123" };
+      (redisUtil.get as jest.Mock).mockResolvedValue("u-123");
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.refreshToken.create as jest.Mock).mockResolvedValue({
+        id: "rt-123",
+        tokenHash: "hashed-token",
+      });
+      (redisUtil.del as jest.Mock).mockResolvedValue(1); // <-- must mock this
+
+      // Get the mocked instance of MagicLinkServiceImpl
+      magicLinkService = (MagicLinkServiceImpl as jest.Mock).mock.results[0]
+        ?.value as jest.Mocked<MagicLinkServiceImpl>;
+
+      await authController.continueOnDevice(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith("auth:qr:req-123");
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "u-123" },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          phone: mockUser.phone,
+          name: mockUser.name,
+          timeZone: mockUser.timeZone,
+          createdAt: mockUser.createdAt,
+          updatedAt: mockUser.updatedAt,
+          onboarded: mockUser.onboarded,
+        },
+      });
+      expect(res.cookie).toHaveBeenCalledWith(
+        "auth_token",
+        "mock-token",
+        expect.any(Object)
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        "refresh_token",
+        expect.any(String),
+        expect.any(Object)
+      );
+      expect(redisUtil.del).toHaveBeenCalledTimes(2); // session key + auth status
+    });
+
+    it("should handle internal errors gracefully", async () => {
+      req.body = { requestId: "req-123" };
+      (redisUtil.get as jest.Mock).mockRejectedValue(new Error("redis crash"));
+
+      await authController.continueOnDevice(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Internal server error",
+      });
+    });
+  });
 });
