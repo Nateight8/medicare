@@ -77,27 +77,24 @@ export const authController = {
     try {
       const { payload, error } = await magicLinkService.validateToken(token);
 
-      if (error === 'expired') {
+      if (error === "expired") {
         return res.redirect(
           `${process.env.WEB_APP_URL}/auth/error?reason=expired_token`
         );
       }
 
-      if (error === 'used_or_revoked') {
+      if (error === "used_or_revoked") {
         return res.redirect(
           `${process.env.WEB_APP_URL}/auth/error?reason=used_token`
         );
       }
 
-      if (error === 'invalid' || !payload) {
+      if (error === "invalid" || !payload) {
         return res.redirect(
           `${process.env.WEB_APP_URL}/auth/error?reason=invalid_token`
         );
       }
 
-      // Immediately delete the token to prevent multiple uses
-      await redisUtil.del(`auth:magiclink:${token}`);
-      
       // Set validated state - magic link clicked, waiting for device continuation
       await redisUtil.set(
         `auth:status:${payload.email}`,

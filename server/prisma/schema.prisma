@@ -26,6 +26,8 @@ model User {
   email         String        @unique
   phone         String?       @unique
   name          String?
+  displayName   String?       @map("display_name")
+  dateOfBirth   DateTime?     @map("date_of_birth")
   timeZone      String        @default("UTC")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

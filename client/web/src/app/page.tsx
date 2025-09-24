@@ -1,6 +1,5 @@
 "use client";
 
-import EditProfileDialog from "./profile/_components/edit-dialotg";
 import { useAuth } from "../components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -28,7 +27,6 @@ export default function Home() {
       <Button effect="ringHover" onClick={() => logout()}>
         Logout
       </Button>
-      <EditProfileDialog />
 
       <ThemeToggle />
       <Button loading={true} effect="gooeyLeft" variant="default">

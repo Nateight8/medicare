@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ProgressIndicator } from "./_components/progress-indicator";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -35,12 +35,15 @@ import {
   WheelPickerOption,
   WheelPickerWrapper,
 } from "@/components/wheel-picker";
+import { useMutation } from "@apollo/client";
+import { meOperation } from "@/graphql/operations/me";
 
 //form
 const formSchema = z.object({
-  name: z.string(),
+  displayName: z.string(),
   image: z.string().optional(),
   age: z.number(),
+  dateOfBirth: z.date().optional(),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -59,15 +62,61 @@ const createArray = (length: number, add = 1): WheelPickerOption[] =>
 export default function Page() {
   const options = createArray(60);
 
+  //month options
+  const monthOptions: WheelPickerOption[] = [
+    { label: "January", value: "1" },
+    { label: "February", value: "2" },
+    { label: "March", value: "3" },
+    { label: "April", value: "4" },
+    { label: "May", value: "5" },
+    { label: "June", value: "6" },
+    { label: "July", value: "7" },
+    { label: "August", value: "8" },
+    { label: "September", value: "9" },
+    { label: "October", value: "10" },
+    { label: "November", value: "11" },
+    { label: "December", value: "12" },
+  ];
+
+  const createYearOptions = (): WheelPickerOption[] => {
+    const currentYear = new Date().getFullYear();
+    const startYear = 1920;
+    return Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
+      const year = currentYear - i; // Start from current year and go backwards
+      return {
+        label: year.toString(),
+        value: year.toString(),
+      };
+    });
+  };
+
+  const yearOptions = createYearOptions();
+
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       age: Number(options[0]?.value) || 1, // Use the first option's value as default
+      displayName: "",
+      image: "",
     },
   });
 
+  const [updateUserProfile, { loading }] = useMutation(
+    meOperation.Mutations.updateProfile
+  );
+
   const onSubmit: SubmitHandler<FormSchema> = (values) => {
     console.log(values);
+    updateUserProfile({
+      variables: {
+        input: {
+          name: values.displayName, // Use displayName as the name for onboarding
+          displayName: values.displayName,
+          age: values.age,
+          image: values.image,
+        },
+      },
+    });
   };
 
   const [step, setStep] = useState(1);
@@ -111,7 +160,14 @@ export default function Page() {
         {/* content */}
         {step === 1 && <AvatarUpload />}
         {step === 2 && <DisplayName form={form} />}
-        {step === 3 && <AgeWheelPicker form={form} options={options} />}
+        {step === 3 && (
+          <AgeWheelPicker
+            form={form}
+            options={options}
+            monthOptions={monthOptions}
+            yearOptions={yearOptions}
+          />
+        )}
         {step >= 4 && <Preview form={form} />}
 
         {/* footer */}
@@ -129,7 +185,14 @@ export default function Page() {
           )}
 
           {step === 4 && (
-            <Button size="lg" effect="ringHover" type="submit">
+            <Button
+              loading={loading}
+              loadingIconPlacement="left"
+              loadingText="Submitting..."
+              size="lg"
+              effect="ringHover"
+              type="submit"
+            >
               Submit
             </Button>
           )}
@@ -178,7 +241,7 @@ function DisplayName({ form }: { form: FormType }) {
   return (
     <FormField
       control={form.control}
-      name="name"
+      name="displayName"
       render={({ field }) => (
         <div className="flex-1 py-4 border-b md:px-14 flex items-center md:items-end max-w-md mx-auto w-full justify-center">
           <FormItem className="w-full">
@@ -206,29 +269,125 @@ function DisplayName({ form }: { form: FormType }) {
 
 function AgeWheelPicker({
   form,
-  options,
+  monthOptions,
+  yearOptions,
 }: {
   options: WheelPickerOption[];
   form: FormType;
+  monthOptions: WheelPickerOption[];
+  yearOptions: WheelPickerOption[];
 }) {
+  const createDayOptions = (daysInMonth: number): WheelPickerOption[] =>
+    Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      return {
+        label: day.toString().padStart(2, "0"),
+        value: day.toString(),
+      };
+    });
+
+  const [selectedMonth, setSelectedMonth] = useState(1);
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [dayOptions, setDayOptions] = useState<WheelPickerOption[]>([]);
+
+  // Initialize day options based on current month and year
+  useEffect(() => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    setDayOptions(createDayOptions(daysInMonth));
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    setDayOptions(createDayOptions(daysInMonth));
+
+    // Adjust selected day if it's beyond the days in the new month
+    if (selectedDay > daysInMonth) {
+      setSelectedDay(daysInMonth);
+    }
+  }, [selectedMonth, selectedYear, selectedDay]);
+
+  const getDaysInMonth = (month: number, year: number): number => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const updateFormAge = (day: number, month: number, year: number) => {
+    // Create date at noon to avoid timezone issues
+    const birthDate = new Date(year, month - 1, day, 12, 0, 0);
+
+    // Calculate age
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+
+    // Update both age and date of birth in the form
+    form.setValue("age", age);
+    form.setValue("dateOfBirth", birthDate);
+  };
+
+  // Initialize with current date on component mount
+  useEffect(() => {
+    const today = new Date();
+    setSelectedMonth(today.getMonth() + 1);
+    setSelectedDay(today.getDate());
+    setSelectedYear(today.getFullYear());
+
+    // Set initial date of birth in the form
+    form.setValue("dateOfBirth", today);
+
+    // Calculate initial age
+    updateFormAge(today.getDate(), today.getMonth() + 1, today.getFullYear());
+  }, [form]);
+
   return (
     <FormField
       control={form.control}
       name="age"
       render={({ field }) => (
-        <FormItem className="flex max-w-md mx-auto flex-1 flex-col items-center justify-center">
-          <FormLabel className="text-2xl text-center font-semibold tracking-tight">
-            How old are you?
+        <FormItem className="flex max-w-md  mx-auto flex-1 flex-col items-center justify-center">
+          <FormLabel className="text-2xl mb-4 text-center font-semibold tracking-tight">
+            Date of Birth
           </FormLabel>
 
           <FormControl>
-            <WheelPickerWrapper>
-              <WheelPicker
-                options={options}
-                value={field.value?.toString() || options[0]?.value}
-                onValueChange={(val) => field.onChange(Number(val))}
-              />
-            </WheelPickerWrapper>
+            <div className="w-80 ">
+              <WheelPickerWrapper>
+                <WheelPicker
+                  options={dayOptions}
+                  value={selectedDay.toString()}
+                  onValueChange={(val) => {
+                    const day = Number(val);
+                    setSelectedDay(day);
+                    updateFormAge(day, selectedMonth, selectedYear);
+                  }}
+                />
+                <WheelPicker
+                  options={monthOptions}
+                  value={selectedMonth.toString()}
+                  onValueChange={(val) => {
+                    const month = Number(val);
+                    setSelectedMonth(month);
+                    updateFormAge(selectedDay, month, selectedYear);
+                  }}
+                />
+                <WheelPicker
+                  options={yearOptions}
+                  value={selectedYear.toString()}
+                  onValueChange={(val) => {
+                    const year = Number(val);
+                    setSelectedYear(year);
+                    updateFormAge(selectedDay, selectedMonth, year);
+                  }}
+                />
+              </WheelPickerWrapper>
+            </div>
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -238,7 +397,7 @@ function AgeWheelPicker({
 }
 
 function Preview({ form }: { form: FormType }) {
-  const displayName = form.watch("name");
+  const displayName = form.watch("displayName");
 
   return (
     <>

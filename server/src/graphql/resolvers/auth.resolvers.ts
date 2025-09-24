@@ -52,7 +52,7 @@ export const authResolvers = {
         });
       }
 
-      const { name, phone, timeZone } = input;
+      const { name, phone, timeZone, age, displayName, image } = input;
 
       if (timeZone && !isValidIANA(timeZone)) {
         throw new GraphQLError("Invalid timeZone", {
@@ -75,6 +75,9 @@ export const authResolvers = {
       if (name !== undefined) data.name = name;
       if (phone !== undefined) data.phone = phone;
       if (timeZone !== undefined) data.timeZone = timeZone;
+      if (displayName !== undefined) data.displayName = displayName;
+      if (age !== undefined) data.age = age;
+      if (image !== undefined) data.image = image;
 
       // Mark as onboarded if name is provided and it's not yet true
       if (!existingUser.onboarded && name) {

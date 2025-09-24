@@ -1,7 +1,12 @@
 import { redisUtil } from "../../lib/redis";
 import { JWTTokenService } from "./tokenService";
 import { emailService } from "./emailService";
-import type { MagicLinkService, TokenPayload, AuthConfig, TokenValidationResult } from "../types";
+import type {
+  MagicLinkService,
+  TokenPayload,
+  AuthConfig,
+  TokenValidationResult,
+} from "../types";
 import { randomUUID } from "crypto";
 
 export class MagicLinkServiceImpl implements MagicLinkService {
@@ -94,7 +99,9 @@ export class MagicLinkServiceImpl implements MagicLinkService {
 
   async requestMagicLink(email: string): Promise<{ expiresIn: string }> {
     try {
-      console.log(`[MagicLinkService] Requesting magic link for email: ${email}`);
+      console.log(
+        `[MagicLinkService] Requesting magic link for email: ${email}`
+      );
 
       const payload: TokenPayload = {
         email,
@@ -111,20 +118,26 @@ export class MagicLinkServiceImpl implements MagicLinkService {
 
       // Store in Redis with metadata
       const redisKey = this.getRedisKey(token);
-      console.log(`[MagicLinkService] Storing token in Redis with key: ${redisKey}`);
+      console.log(
+        `[MagicLinkService] Storing token in Redis with key: ${redisKey}`
+      );
 
       const ttl = 15 * 60; // 15 minutes
       const now = Date.now();
       const tokenData = {
         email,
-        status: 'active',
+        status: "active",
         issuedAt: now,
-        expiresAt: now + (ttl * 1000),
-        lastUsedAt: null
+        expiresAt: now + ttl * 1000,
+        lastUsedAt: null,
       };
 
       // Store the token with metadata
-      const stored = await redisUtil.set(redisKey, JSON.stringify(tokenData), ttl);
+      const stored = await redisUtil.set(
+        redisKey,
+        JSON.stringify(tokenData),
+        ttl
+      );
       if (!stored) throw new Error("Failed to store token in Redis");
 
       // Add token to email mapping for efficient revocation
@@ -150,49 +163,53 @@ export class MagicLinkServiceImpl implements MagicLinkService {
     // First check if token exists in Redis
     const redisKey = this.getRedisKey(token);
     const tokenDataStr = await redisUtil.get(redisKey);
-    
+
     if (!tokenDataStr) {
-      console.log("[MagicLinkService] Token not found in Redis - already used or revoked");
-      return { payload: null, error: 'used_or_revoked' };
+      console.log(
+        "[MagicLinkService] Token not found in Redis - already used or revoked"
+      );
+      return { payload: null, error: "used_or_revoked" };
     }
 
     try {
       // Verify token signature and expiration
       console.log("[MagicLinkService] Verifying token signature...");
       let payload: TokenPayload | null;
-      
+
       try {
         payload = await this.tokenService.verifyToken(token);
-        
+
         if (!payload || payload.type !== "magiclink") {
           console.log("[MagicLinkService] Invalid token payload or type");
-          return { payload: null, error: 'invalid' };
+          return { payload: null, error: "invalid" };
         }
       } catch (error) {
         if (error instanceof Error) {
-          if (error.message === 'expired') {
-            return { payload: null, error: 'expired' };
-          } else if (error.message === 'invalid') {
-            return { payload: null, error: 'invalid' };
+          if (error.message === "expired") {
+            return { payload: null, error: "expired" };
+          } else if (error.message === "invalid") {
+            return { payload: null, error: "invalid" };
           }
         }
         console.error("[MagicLinkService] Error verifying token:", error);
-        return { payload: null, error: 'invalid' };
+        return { payload: null, error: "invalid" };
       }
 
       const tokenData = JSON.parse(tokenDataStr);
       const now = Date.now();
-      
+
       // Check if token is expired
       if (now > tokenData.expiresAt) {
         console.log("[MagicLinkService] Token has expired");
         await redisUtil.del(redisKey); // Clean up expired token
-        return { payload: null, error: 'expired' };
+        return { payload: null, error: "expired" };
       }
 
-      // Immediately remove the token to prevent multiple uses
-      await redisUtil.del(redisKey);
-      
+      // Mark token as used and update last used timestamp
+      tokenData.status = "used";
+      tokenData.lastUsedAt = now;
+      await redisUtil.set(redisKey, JSON.stringify(tokenData), 60); // Keep used token for 1 minute before cleanup
+
       // Remove token from email mapping
       await this.removeTokenFromEmailMapping(payload.email, token);
 
@@ -203,7 +220,7 @@ export class MagicLinkServiceImpl implements MagicLinkService {
       return { payload };
     } catch (error) {
       console.error("[MagicLinkService] Error validating token:", error);
-      return { payload: null, error: 'invalid' };
+      return { payload: null, error: "invalid" };
     }
   }
 

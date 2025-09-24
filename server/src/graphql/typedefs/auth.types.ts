@@ -13,13 +13,13 @@ export const authTypeDefs = gql`
     Update the authenticated user's profile
     """
     updateProfile(input: UpdateProfileInput!): UpdateProfileResponse!
-    
+
     """
     Logout the current user and invalidate the session
     """
     logout: LogoutResponse!
   }
-  
+
   """
   Response for logout operation
   """
@@ -32,6 +32,9 @@ export const authTypeDefs = gql`
   """
   input UpdateProfileInput {
     name: String
+    displayName: String
+    age: Int
+    image: String
     phone: String
     timeZone: String
   }
@@ -48,6 +51,9 @@ interface UpdateProfileInput {
   name?: string;
   phone?: string;
   timeZone?: string;
+  age?: number;
+  displayName?: string;
+  image?: string;
 }
 
 export type { UpdateProfileInput };
