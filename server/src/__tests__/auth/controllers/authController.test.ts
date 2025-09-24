@@ -12,12 +12,29 @@ jest.mock("useragent", () => ({
   })),
 }));
 
-// ---- Manual mocks for MagicLinkServiceImpl ----
+// Manual mocks
 const mockRequestMagicLink = jest.fn();
 const mockRevokeMagicLink = jest.fn();
 const mockValidateToken = jest.fn();
 const mockStoreAuthRequest = jest.fn();
+const mockTokenService = {
+  generateToken: jest.fn().mockResolvedValue("mock-token"),
+};
 
+// Mock MagicLinkService before importing the controller
+jest.mock("../../../../src/auth/services/magicLinkService", () => {
+  return {
+    MagicLinkServiceImpl: jest.fn().mockImplementation(() => ({
+      requestMagicLink: mockRequestMagicLink,
+      revokeMagicLink: mockRevokeMagicLink,
+      validateToken: mockValidateToken,
+      storeAuthRequest: mockStoreAuthRequest,
+      tokenService: mockTokenService,
+    })),
+  };
+});
+
+// Import after mocks to ensure they're available
 import { authController } from "../../../../src/auth/controllers/authController";
 import { redisUtil } from "../../../../src/lib/redis";
 import { MagicLinkServiceImpl } from "../../../../src/auth/services/magicLinkService";
@@ -26,7 +43,7 @@ import { MagicLinkServiceImpl } from "../../../../src/auth/services/magicLinkSer
 let magicLinkService: jest.Mocked<MagicLinkServiceImpl>;
 import prisma from "../../../../src/lib/prisma";
 
-// ---- Mock Redis ----
+// Mock Redis
 jest.mock("../../../../src/lib/redis", () => ({
   redisUtil: {
     get: jest.fn(),
@@ -35,18 +52,13 @@ jest.mock("../../../../src/lib/redis", () => ({
   },
 }));
 
-// ---- Mock MagicLinkService ----
-jest.mock("../../../../src/auth/services/magicLinkService", () => ({
-  MagicLinkServiceImpl: jest.fn().mockImplementation(() => ({
-    requestMagicLink: mockRequestMagicLink,
-    revokeMagicLink: mockRevokeMagicLink,
-    validateToken: mockValidateToken,
-    storeAuthRequest: mockStoreAuthRequest,
-    tokenService: {
-      generateToken: jest.fn().mockResolvedValue("mock-token"),
-    },
-  })),
-}));
+beforeEach(() => {
+  // Reset all mocks
+  jest.clearAllMocks();
+
+  // Reset the mock implementation
+  mockTokenService.generateToken.mockResolvedValue("mock-token");
+});
 
 // ---- Mock Prisma ----
 jest.mock("../../../../src/lib/prisma", () => ({
@@ -412,6 +424,223 @@ describe("authController", () => {
       expect(res.json).toHaveBeenCalledWith({
         error: "Internal server error",
       });
+    });
+  });
+
+  // ---------------------------
+  // pollAuthStatus
+  // ---------------------------
+  describe("pollAuthStatus", () => {
+    it("should return 'pending' when redis has pending status", async () => {
+      req.body.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockResolvedValue("pending");
+
+      await authController.pollAuthStatus(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith(
+        "auth:status:test@example.com"
+      );
+      expect(res.json).toHaveBeenCalledWith({ status: "pending" });
+    });
+
+    it("should return 'validated' when redis has validated status", async () => {
+      req.body.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockResolvedValue("validated");
+
+      await authController.pollAuthStatus(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith(
+        "auth:status:test@example.com"
+      );
+      expect(res.json).toHaveBeenCalledWith({ status: "validated" });
+    });
+
+    it("should return 'not_started' when redis has no status", async () => {
+      req.body.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockResolvedValue(null);
+
+      await authController.pollAuthStatus(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith(
+        "auth:status:test@example.com"
+      );
+      expect(res.json).toHaveBeenCalledWith({ status: "not_started" });
+    });
+
+    it("should handle redis errors gracefully", async () => {
+      req.body.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockRejectedValue(new Error("redis fail"));
+
+      await authController.pollAuthStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Internal server error",
+      });
+    });
+  });
+
+  // ---------------------------
+  // getAuthStatus
+  // ---------------------------
+  describe("getAuthStatus", () => {
+    it("should return status from redis if exists", async () => {
+      req.query.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockResolvedValue("validated");
+
+      await authController.getAuthStatus(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith(
+        "auth:status:test@example.com"
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        status: "validated",
+        success: true,
+      });
+    });
+
+    it("should return 'not_started' if redis returns null", async () => {
+      req.query.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockResolvedValue(null);
+
+      await authController.getAuthStatus(req, res);
+
+      expect(redisUtil.get).toHaveBeenCalledWith(
+        "auth:status:test@example.com"
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        status: "not_started",
+        success: true,
+      });
+    });
+
+    it("should return 400 if email is missing", async () => {
+      req.query = {}; // no email
+
+      await authController.getAuthStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "Email is required" });
+    });
+
+    it("should return 500 if redis throws an error", async () => {
+      req.query.email = "test@example.com";
+      (redisUtil.get as jest.Mock).mockRejectedValue(new Error("Redis down"));
+
+      await authController.getAuthStatus(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Failed to get auth status",
+        success: false,
+      });
+    });
+  });
+
+  describe("refreshToken", () => {
+    it("should return 401 if no refresh token is provided", async () => {
+      req.cookies = {}; // no refresh_token
+
+      await authController.refreshToken(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "No refresh token provided",
+      });
+    });
+
+    it("should return 401 if token not found in DB", async () => {
+      const refreshTokenValue = "refresh-token-123";
+      req.cookies = { refresh_token: refreshTokenValue };
+
+      (prisma.refreshToken.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await authController.refreshToken(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Invalid or expired refresh token",
+      });
+    });
+
+    it("should return 401 if token is expired", async () => {
+      const refreshTokenValue = "refresh-token-123";
+      req.cookies = { refresh_token: refreshTokenValue };
+
+      const expiredToken = {
+        id: "rt-123",
+        tokenHash: "hashed-token",
+        expiresAt: new Date(Date.now() - 1000), // expired
+        user: { id: "u-123", email: "test@example.com" },
+      };
+      (prisma.refreshToken.findUnique as jest.Mock).mockResolvedValue(
+        expiredToken
+      );
+
+      await authController.refreshToken(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: "Invalid or expired refresh token",
+      });
+    });
+
+    it("should generate new tokens and set cookies", async () => {
+      const refreshTokenValue = "refresh-token-123";
+      req.cookies = { refresh_token: refreshTokenValue };
+
+      const storedToken = {
+        id: "rt-123",
+        tokenHash: "hashed-token",
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60), // valid
+        user: { id: "u-123", email: "test@example.com" },
+      };
+      (prisma.refreshToken.findUnique as jest.Mock).mockResolvedValue(
+        storedToken
+      );
+      (prisma.$transaction as jest.Mock).mockResolvedValue([
+        {}, // delete result
+        {}, // create result
+      ]);
+
+      // Set up the mock for this specific test
+      mockTokenService.generateToken.mockResolvedValue("new-access-token");
+
+      await authController.refreshToken(req, res);
+
+      expect(mockTokenService.generateToken).toHaveBeenCalledWith(
+        { userId: "u-123", email: "test@example.com", type: "refresh" },
+        { expiresIn: process.env.JWT_EXPIRY || "1h" }
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        "auth_token",
+        "new-access-token",
+        expect.any(Object)
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        "refresh_token",
+        expect.any(String),
+        expect.any(Object)
+      );
+
+      expect(res.json).toHaveBeenCalledWith({ success: true });
+    });
+
+    it("should handle internal errors gracefully", async () => {
+      req.cookies = { refresh_token: "refresh-token-123" };
+      (prisma.refreshToken.findUnique as jest.Mock).mockRejectedValue(
+        new Error("DB down")
+      );
+
+      await authController.refreshToken(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: "Internal server error" });
     });
   });
 });
