@@ -1,6 +1,3 @@
-// tests/auth/services/magicLinkService.test.ts
-
-// Mock dependencies before imports
 // Mock dependencies before imports
 const mockRedisUtil = {
   get: jest.fn<(key: string) => Promise<string | null>>(),
