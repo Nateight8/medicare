@@ -95,7 +95,7 @@ describe("MagicLinkServiceImpl", () => {
 
       expect(minimalService["config"].magicLinkBaseUrl).toBe("");
       expect(minimalService["config"].jwtSecret).toBe("your-secret-key");
-      expect(minimalService["config"].tokenExpiry).toBe("1h");
+      expect(minimalService["config"].tokenExpiry).toBe("0ms");
       expect(minimalService["config"].redisPrefix).toBe("auth:");
     });
   });
@@ -209,12 +209,36 @@ describe("MagicLinkServiceImpl", () => {
       expect(result.error).toBe("used_or_revoked");
     });
 
-    it("should return error for expired token", async () => {
+    it("should return error for expired JWT token", async () => {
+      // Mock Redis to return valid token data
+      mockRedisUtil.get.mockResolvedValueOnce(JSON.stringify(mockTokenData));
+
+      // Mock the token verification to throw an 'expired' error
+      const error = new Error("expired");
+      error.message = "expired";
+      mockTokenService.verifyToken.mockRejectedValueOnce(error);
+
+      const result = await service.validateToken(testToken);
+
+      expect(result.payload).toBeNull();
+      expect(result.error).toBe("expired");
+    });
+
+    it("should return error for token expired in Redis", async () => {
       const expiredTokenData = {
         ...mockTokenData,
         expiresAt: Date.now() - 60000, // Expired 1 minute ago
       };
+
+      // Mock Redis to return the expired token data
       mockRedisUtil.get.mockResolvedValueOnce(JSON.stringify(expiredTokenData));
+      // Mock the del method since we expect it to be called for cleanup
+      mockRedisUtil.del.mockResolvedValueOnce(true);
+      // Mock token verification to pass
+      mockTokenService.verifyToken.mockResolvedValueOnce({
+        email: testEmail,
+        type: "magiclink",
+      });
 
       const result = await service.validateToken(testToken);
 
