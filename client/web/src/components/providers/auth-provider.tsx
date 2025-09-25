@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useState,
   useEffect,
+  useCallback,
 } from "react";
 import { useLazyQuery, useMutation, ApolloError } from "@apollo/client";
 import { meOperation } from "@/graphql/operations/me";
@@ -18,11 +19,14 @@ interface User {
   onboarded?: boolean;
 }
 
+type LoginProvider = "google" | "email";
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: ApolloError | undefined;
   isAuthenticated: boolean;
+  login: (provider: LoginProvider) => Promise<void>;
   logout: () => Promise<boolean>;
 }
 
@@ -56,6 +60,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, [getMe]);
 
+  const login = useCallback(async (provider: LoginProvider = "google") => {
+    try {
+      if (provider === "google") {
+        const baseUrl = process.env.NEXT_PUBLIC_GRAPHQL_URI?.replace(
+          /\/graphql$/,
+          ""
+        );
+        window.location.href = `${baseUrl}/api/auth/${provider}`;
+      } else {
+        throw new Error(`Unsupported login provider: ${provider}`);
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      throw err;
+    }
+  }, []);
+
   const value = useMemo(() => {
     const user = data?.me || null;
     return {
@@ -63,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading: !ready || loading,
       error,
       isAuthenticated: !!user,
+      login,
       logout: () => logoutMutation().then((res) => res.data?.logout?.success),
     };
-  }, [data, loading, error, logoutMutation, ready]);
+  }, [data, loading, error, login, logoutMutation, ready]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

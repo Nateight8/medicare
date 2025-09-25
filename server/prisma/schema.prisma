@@ -21,6 +21,12 @@ enum AnchorStrategy {
   FROM_SCHEDULED_TIME
 }
 
+enum DeviceType {
+  MOBILE
+  DESKTOP
+  TABLET
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -31,11 +37,32 @@ model User {
   timeZone      String        @default("UTC")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
   prescriptions Prescription[]
   doseEvents    DoseEvent[]
   refreshTokens RefreshToken[]  @relation("UserRefreshTokens")
+  sessions      Session[]
   onboarded     Boolean       @default(false)
 }
+
+
+model Session {
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  userAgent  String   
+  ip         String?
+  city       String?
+  region     String?
+  country    String?
+  
+  lastActive DateTime @default(now())
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  isActive   Boolean  @default(true)
+}
+
 
 model RefreshToken {
   id        String   @id @default(cuid())

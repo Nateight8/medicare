@@ -36,17 +36,14 @@ export async function createServer() {
   // Initialize Passport
   app.use(passport.initialize());
 
-  // Mount auth routes under /api prefix
+  // Mount all auth routes under /api
   app.use("/api", authRoutes);
-
-  // Mount OAuth routes under /api/auth prefix
-  app.use("/api/auth", oauthRoutes);
+  app.use("/api", oauthRoutes);
 
   const tokenService = new JWTTokenService({
     jwtSecret: process.env.JWT_SECRET || "your-secret-key",
     tokenExpiry: process.env.JWT_EXPIRY || "1h",
-    magicLinkBaseUrl:
-      process.env.MAGIC_LINK_BASE_URL || "http://localhost:3000/auth/verify",
+    magicLinkBaseUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   });
 
   const server = new ApolloServer({

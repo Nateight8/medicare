@@ -21,8 +21,13 @@ export class MagicLinkServiceImpl implements MagicLinkService {
         ? `${config.tokenExpiry}ms`
         : config.tokenExpiry || "1h";
 
+    // Ensure magicLinkBaseUrl doesn't include the /api/auth/magiclink/validate part
+    const baseUrl = (config.magicLinkBaseUrl || "").replace(
+      /\/api\/auth\/magiclink\/validate$/,
+      ""
+    );
     this.config = {
-      magicLinkBaseUrl: config.magicLinkBaseUrl || "",
+      magicLinkBaseUrl: baseUrl,
       jwtSecret: config.jwtSecret || "your-secret-key",
       tokenExpiry: this.tokenExpiry,
       redisPrefix: config.redisPrefix || "auth:",
@@ -113,7 +118,10 @@ export class MagicLinkServiceImpl implements MagicLinkService {
         expiresIn: this.config.tokenExpiry,
       });
 
-      const link = `${this.config.magicLinkBaseUrl}?token=${token}`;
+      // Construct the magic link URL
+      // The magicLinkBaseUrl should be the full URL to the frontend
+      const baseUrl = this.config.magicLinkBaseUrl.replace(/\/$/, ""); // Remove trailing slash if present
+      const link = `${baseUrl}/api/auth/magiclink/validate?token=${token}`;
       console.log(`[MagicLinkService] Generated magic link: ${link}`);
 
       // Store in Redis with metadata
@@ -198,8 +206,8 @@ export class MagicLinkServiceImpl implements MagicLinkService {
       const tokenData = JSON.parse(tokenDataStr);
       const now = Date.now();
 
-      // Check if token is expired
-      if (now > tokenData.expiresAt) {
+      // Check if token is expired (using >= to include the exact expiration time)
+      if (now >= tokenData.expiresAt) {
         console.log("[MagicLinkService] Token has expired");
         await redisUtil.del(redisKey); // Clean up expired token
         return { payload: null, error: "expired" };

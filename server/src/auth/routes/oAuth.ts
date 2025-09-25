@@ -5,19 +5,13 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { redisUtil } from "@/lib/redis";
 import { User } from "@prisma/client";
 import { MagicLinkServiceImpl } from "../services/magicLinkService";
+import { magicLinkConfig } from "../config/magicLinkConfig";
 
 import { addDays } from "date-fns";
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
 
-const magicLinkService = new MagicLinkServiceImpl({
-  magicLinkBaseUrl:
-    process.env.BACKEND_URL ||
-    "http://localhost:4000/api/auth/magiclink/validate",
-  jwtSecret: process.env.JWT_SECRET || "your-secret-key",
-  tokenExpiry: "5m",
-  redisPrefix: "auth:",
-});
+const magicLinkService = new MagicLinkServiceImpl(magicLinkConfig);
 
 const router = Router();
 

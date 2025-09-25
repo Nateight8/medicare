@@ -42,9 +42,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useProfileActions } from "@/hooks/use-profile-actions";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function Page() {
   const { user, logout } = useAuth();
+
+  const { handleAccountDelete, deleteAccountLoading } = useProfileActions();
+
   return (
     <>
       <div className="w-full flex items-center justify-center py-6 px-4">
@@ -213,9 +218,16 @@ export default function Page() {
                   <span className="text-sm font-medium">Sign Out</span>
                 </div>
               </button>
-              <button className="flex items-center justify-between w-full p-4 hover:bg-muted transition-colors group">
+              <button
+                onClick={handleAccountDelete}
+                className="flex items-center justify-between w-full p-4 hover:bg-muted transition-colors group"
+              >
                 <div className="flex items-center space-x-3">
-                  <TrashIcon className="w-5 h-5 text-destructive" />
+                  {deleteAccountLoading ? (
+                    <Spinner />
+                  ) : (
+                    <TrashIcon className="w-5 h-5 text-destructive" />
+                  )}
                   <span className="text-sm font-medium text-destructive group-hover:text-destructive/80">
                     Delete Account
                   </span>

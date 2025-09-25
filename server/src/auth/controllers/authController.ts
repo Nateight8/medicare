@@ -7,15 +7,10 @@ import { TokenPayload } from "../types";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { addDays, isBefore } from "date-fns";
+import { SessionService } from "../services/sessionService";
+import { magicLinkConfig } from "../config/magicLinkConfig";
 
-const magicLinkService = new MagicLinkServiceImpl({
-  magicLinkBaseUrl:
-    process.env.BACKEND_URL ||
-    "http://localhost:4000/api/auth/magiclink/validate",
-  jwtSecret: process.env.JWT_SECRET || "your-secret-key",
-  tokenExpiry: "5m",
-  redisPrefix: "auth:",
-});
+const magicLinkService = new MagicLinkServiceImpl(magicLinkConfig);
 
 export const authController = {
   async sendMagicLink(req: Request, res: Response) {
@@ -70,7 +65,7 @@ export const authController = {
     const { token } = req.query;
     if (typeof token !== "string") {
       return res.redirect(
-        `${process.env.WEB_APP_URL}/auth/error?reason=invalid_token`
+        `http://localhost:3000/auth/error?reason=invalid_token`
       );
     }
 
@@ -79,19 +74,19 @@ export const authController = {
 
       if (error === "expired") {
         return res.redirect(
-          `${process.env.WEB_APP_URL}/auth/error?reason=expired_token`
+          `http://localhost:3000/auth/error?reason=expired_token`
         );
       }
 
       if (error === "used_or_revoked") {
         return res.redirect(
-          `${process.env.WEB_APP_URL}/auth/error?reason=used_token`
+          `http://localhost:3000/auth/error?reason=used_token`
         );
       }
 
       if (error === "invalid" || !payload) {
         return res.redirect(
-          `${process.env.WEB_APP_URL}/auth/error?reason=invalid_token`
+          `http://localhost:3000/auth/error?reason=invalid_token`
         );
       }
 
@@ -133,7 +128,7 @@ export const authController = {
       // Desktop QR fallback — store userId instead of email
       const requestId = await magicLinkService.storeAuthRequest(user.id);
       return res.redirect(
-        `${process.env.WEB_APP_URL}/auth/qr?requestId=${encodeURIComponent(
+        `http://localhost:3000/auth/qr?requestId=${encodeURIComponent(
           requestId
         )}`
       );
@@ -224,6 +219,9 @@ export const authController = {
         sameSite: "lax",
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
+
+      // Create a new session
+      await SessionService.createSession(user.id, req, addDays(new Date(), 30));
 
       // Clean up Redis - auth is now complete
       await Promise.all([

@@ -14,7 +14,9 @@ export default function Page() {
   useEffect(() => {
     if (!requestId) return;
 
-    fetch(`http://localhost:4000/api/auth/qr?requestId=${requestId}`)
+    fetch(`/auth/qr?requestId=${requestId}`, {
+      credentials: "include", // Include cookies for authentication
+    })
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to fetch QR code");
@@ -40,7 +42,7 @@ export default function Page() {
         window.location.href = "/";
       } else {
         channel.postMessage("onboard");
-        window.location.href = "/onboard";
+        window.location.href = "/onboarding";
       }
     },
     onError: (error) => {
