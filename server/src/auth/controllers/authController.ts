@@ -65,7 +65,7 @@ export const authController = {
     const { token } = req.query;
     if (typeof token !== "string") {
       return res.redirect(
-        `http://localhost:3000/auth/error?reason=invalid_token`
+        `${process.env.CORS_ORIGIN}/auth/error?reason=invalid_token`
       );
     }
 
@@ -74,19 +74,19 @@ export const authController = {
 
       if (error === "expired") {
         return res.redirect(
-          `http://localhost:3000/auth/error?reason=expired_token`
+          `${process.env.CORS_ORIGIN}/auth/error?reason=expired_token`
         );
       }
 
       if (error === "used_or_revoked") {
         return res.redirect(
-          `http://localhost:3000/auth/error?reason=used_token`
+          `${process.env.CORS_ORIGIN}/auth/error?reason=used_token`
         );
       }
 
       if (error === "invalid" || !payload) {
         return res.redirect(
-          `http://localhost:3000/auth/error?reason=invalid_token`
+          `${process.env.CORS_ORIGIN}/auth/error?reason=invalid_token`
         );
       }
 
@@ -128,7 +128,7 @@ export const authController = {
       // Desktop QR fallback — store userId instead of email
       const requestId = await magicLinkService.storeAuthRequest(user.id);
       return res.redirect(
-        `http://localhost:3000/auth/qr?requestId=${encodeURIComponent(
+        `${process.env.CORS_ORIGIN}/auth/qr?requestId=${encodeURIComponent(
           requestId
         )}`
       );
