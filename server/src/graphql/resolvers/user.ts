@@ -4,6 +4,7 @@ import { GraphqlContext } from "../context";
 import { UpdateProfileInput } from "../typedefs/user";
 import { redisUtil } from "@/lib/redis";
 import { createHash } from "crypto";
+import { accountDeletionQueue } from "@/queues/accountDeletion";
 
 export const userResolvers = {
   Query: {
@@ -48,31 +49,36 @@ export const userResolvers = {
         });
       }
 
+      const userId = ctx.user.id;
+
       try {
-        // Use a transaction to ensure all deletes succeed or fail together
-        await ctx.prisma.$transaction([
-          // Delete all user's dose events
-          ctx.prisma.doseEvent.deleteMany({
-            where: { userId: ctx.user.id },
-          }),
+        // 1️⃣ Mark user as "pending deletion" (soft delete)
+        const now = new Date();
 
-          // Delete all user's prescriptions
-          ctx.prisma.prescription.deleteMany({
-            where: { userId: ctx.user.id },
-          }),
+        await ctx.prisma.user.update({
+          where: { id: userId },
+          data: { deletedAt: now }, // <== deletedAt
+        });
 
-          // Delete all refresh tokens
-          ctx.prisma.refreshToken.deleteMany({
-            where: { userId: ctx.user.id },
-          }),
+        // 2️⃣ Clear sensitive tokens immediately
+        await ctx.prisma.refreshToken.deleteMany({ where: { userId } });
 
-          // Finally, delete the user
-          ctx.prisma.user.delete({
-            where: { id: ctx.user.id },
-          }),
-        ]);
+        // 3️⃣ Schedule permanent deletion in BullMQ
+        // The delay is GRACE_PERIOD in ms
+        const gracePeriodMs =
+          parseInt(process.env.GRACE_PERIOD_DAYS || "7", 10) *
+          24 *
+          60 *
+          60 *
+          1000;
 
-        // Clear auth cookies
+        await accountDeletionQueue.add(
+          "permanentDeleteUser",
+          { userId },
+          { delay: gracePeriodMs }
+        );
+
+        // 4️⃣ Clear auth cookies
         ctx.res?.clearCookie("auth_token", {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
@@ -85,9 +91,14 @@ export const userResolvers = {
           sameSite: "lax",
         });
 
-        return { success: true };
+        return {
+          success: true,
+          message: `Account is scheduled for deletion in ${
+            process.env.GRACE_PERIOD_DAYS || 7
+          } days.`,
+        };
       } catch (error) {
-        console.error("Failed to delete account:", error);
+        console.error("Failed to schedule account deletion:", error);
         throw new GraphQLError("Failed to delete account", {
           extensions: {
             code: "INTERNAL_SERVER_ERROR",
@@ -182,8 +193,6 @@ export const userResolvers = {
         return { success: true }; // Already logged out
       }
 
-      let success = true;
-
       try {
         const refreshTokenValue = req?.cookies?.refresh_token;
         if (refreshTokenValue) {
@@ -197,24 +206,24 @@ export const userResolvers = {
             where: { tokenHash: refreshTokenHash, userId: user.id },
           });
         }
+
+        // Clear cookies
+        res?.clearCookie("auth_token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+        });
+        res?.clearCookie("refresh_token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+        });
+
+        return { success: true };
       } catch (err) {
         console.error("Logout error:", err);
-        success = false;
+        return { success: false };
       }
-
-      // Always clear cookies, even if DB operation failed
-      res?.clearCookie("auth_token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-      res?.clearCookie("refresh_token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-
-      return { success };
     },
   },
 };

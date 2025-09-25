@@ -28,6 +28,13 @@ export const userTypeDefs = gql`
     timeZone: String
   }
 
+  """
+  Response after updating a profile
+  """
+  type MutationResponse {
+    success: Boolean!
+  }
+
   extend type Query {
     """
     Get the currently authenticated user's profile
@@ -39,7 +46,12 @@ export const userTypeDefs = gql`
     """
     Update the authenticated user's profile
     """
-    updateProfile(input: UpdateProfileInput!): UpdateProfileResponse!
+    updateProfile(input: UpdateProfileInput!): MutationResponse!
+
+    """
+    Delete the authenticated user's profile
+    """
+    deleteAccount: MutationResponse!
 
     """
     Logout the current user and invalidate the session
@@ -51,13 +63,6 @@ export const userTypeDefs = gql`
   Response for logout operation
   """
   type LogoutResponse {
-    success: Boolean!
-  }
-
-  """
-  Response after updating a profile
-  """
-  type UpdateProfileResponse {
     success: Boolean!
   }
 `;
