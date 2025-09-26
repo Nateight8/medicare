@@ -10,6 +10,7 @@ import { magicLinkConfig } from "../config/magicLinkConfig";
 import { addDays } from "date-fns";
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
+import { createSession } from "../services/sessionService";
 
 const magicLinkService = new MagicLinkServiceImpl(magicLinkConfig);
 
@@ -22,7 +23,7 @@ const rateLimiter = new RateLimiterMemory({
 });
 
 // --- 1. Start Google OAuth login ---
-router.get("/google", async (req, res, next) => {
+router.get("/auth/google", async (req, res, next) => {
   try {
     await rateLimiter.consume(req.ip ?? "unknown-ip");
 
@@ -47,7 +48,7 @@ router.get("/google", async (req, res, next) => {
 
 // --- 2. Google OAuth callback ---
 router.get(
-  "/google/callback",
+  "/auth/google/callback",
   (req, res, next) => {
     // Handle the Google OAuth callback
     passport.authenticate(
@@ -111,6 +112,9 @@ router.get(
           expiresAt: addDays(new Date(), 30),
         },
       });
+
+      // ✅ Create a new session record
+      await createSession(user.id, req);
 
       // Set HTTP-only cookies
       res.cookie("auth_token", accessToken, {
