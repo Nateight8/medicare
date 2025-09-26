@@ -69,14 +69,21 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write # <-- Fixes SARIF upload issue
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set web image tag for scanning
+        run: echo "WEB_IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
+
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.24.1 # Use a stable release
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:${{ env.WEB_IMAGE_TAG }}
           format: "sarif"
           output: "trivy-results.sarif"
 
