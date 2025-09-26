@@ -152,15 +152,13 @@ jobs:
       - name: Build Docker images
         run: |
           # Build server image
-          docker build -t medicare-server ./server
-
-          # Build client image (if you have a Dockerfile for it)
-          # docker build -t medicare-client ./client/web
+          cd server
+          docker build -t medicare-server .
 
       - name: Test Docker containers
         run: |
           # Quick smoke test
-          docker run --rm -d --name test-server -p 4001:4000 medicare-server
+          docker run --rm -d --name test-server -p 4000:4000 -e NODE_ENV=test -e PORT=4000 medicare-server
           sleep 10
           docker logs test-server
-          docker stop test-server
+          docker stop test-server || true
