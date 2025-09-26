@@ -210,6 +210,11 @@ const config: Config = {
       },
     ],
   },
+
+  // 👇 allow transforming nanoid (pure ESM)
+  transformIgnorePatterns: [
+    "/node_modules/(?!(nanoid)/)", // add other ESM deps here if needed
+  ],
 };
 
 export default config;
