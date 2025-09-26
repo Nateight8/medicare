@@ -9,7 +9,7 @@ export function createAuthMiddleware(config: AuthConfig) {
     req: Request,
     res: Response,
     next: NextFunction
-  ) {
+  ): Promise<Response | void> {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {

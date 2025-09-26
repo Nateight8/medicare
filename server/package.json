@@ -4,8 +4,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "tsx src/index.ts",
+    "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
+    "build": "tsc && npm run db:generate",
     "test:db": "tsx scripts/test-db.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --name",
