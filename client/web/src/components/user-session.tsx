@@ -11,26 +11,25 @@ import {
   InfoCardTitle,
 } from "@/app/profile/_component/info-card";
 import { LaptopIcon } from "lucide-react";
-import { useQuery } from "@apollo/client";
-import {
-  getUserSessionsResponse,
-  sessionOperation,
-  userSession,
-} from "@/graphql/operations/session";
+import { sessionOperation, userSession } from "@/graphql/operations/session";
 import { getCompactRelativeTime } from "@/lib/relative-time";
+import { useSessions } from "@/hooks/use-sessions";
+import { useMutation } from "@apollo/client";
 
 export default function UserSessions() {
-  const { data } = useQuery<getUserSessionsResponse>(
-    sessionOperation.Queries.getUserSessions
+  const { currentDevice, otherDevices } = useSessions();
+
+  const [revokeSessions] = useMutation(
+    sessionOperation.Mutations.revokeSessions
   );
 
-  const currentDevice = data?.getUserSessions.find(
-    (session) => session.isCurrentDevice
-  );
-
-  const otherDevices = data?.getUserSessions.filter(
-    (session) => !session.isCurrentDevice
-  );
+  const revokeAllSessions = () => {
+    revokeSessions({
+      variables: {
+        sessionIds: otherDevices?.map((device) => device.id),
+      },
+    });
+  };
 
   return (
     <div className="w-full min-h-screen border flex justify-center relative">
@@ -70,9 +69,7 @@ export default function UserSessions() {
                   <div>
                     <p className="">{currentDevice?.os}</p>
                     <p className="text-xs text-muted-foreground">
-                      <span>
-                        {currentDevice?.city || "🌎"}
-                      </span>
+                      <span>{currentDevice?.city || "🌎"}</span>
                       <span className="mx-2">•</span>
                       <span>
                         {currentDevice &&
@@ -85,10 +82,34 @@ export default function UserSessions() {
             </div>
             <div className="py-4">
               <h2 className="mb-4">Other Devices</h2>
-              {otherDevices?.map((device) => (
-                <Device key={device.id} {...device} />
-              ))}
+              {otherDevices && otherDevices?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No known devices found
+                </p>
+              ) : (
+                otherDevices?.map((device) => (
+                  <Device key={device.id} {...device} />
+                ))
+              )}
             </div>
+            {otherDevices && otherDevices?.length > 0 && (
+              <div className="py-4">
+                <h1 className="text-base font-semibold mb-1">
+                  log out of all known devices
+                </h1>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You will need to log in again on each device.
+                </p>
+                <Button
+                  className="bg-destructive/5 text-destructive hover:bg-destructive/20"
+                  variant="destructive"
+                  size="sm"
+                  onClick={revokeAllSessions}
+                >
+                  Log out all known devices
+                </Button>
+              </div>
+            )}
           </InfoCardContent>
         </InfoCard>
       </div>
@@ -96,7 +117,19 @@ export default function UserSessions() {
   );
 }
 
-function Device({ lastActive, deviceType, city, os }: userSession) {
+function Device({ lastActive, deviceType, city, os, id }: userSession) {
+  const [revokeSessions] = useMutation(
+    sessionOperation.Mutations.revokeSessions
+  );
+
+  const handleRevokeSession = () => {
+    revokeSessions({
+      variables: {
+        sessionIds: [id],
+      },
+    });
+  };
+
   return (
     <div className="flex py-2 items-center justify-between">
       <div className="space-x-4 flex items-center flex-1">
@@ -112,7 +145,12 @@ function Device({ lastActive, deviceType, city, os }: userSession) {
           </p>
         </div>
       </div>
-      <Button className="rounded-full" size="icon" variant="ghost">
+      <Button
+        onClick={handleRevokeSession}
+        className="rounded-full"
+        size="icon"
+        variant="ghost"
+      >
         <XIcon />
       </Button>
     </div>

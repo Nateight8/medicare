@@ -22,11 +22,22 @@ export const sessionTypeDefs = gql`
     isCurrentDevice: Boolean!
   }
 
+  type RevokeSessionsResponse {
+    success: Boolean!
+  }
+
   extend type Query {
     """
     Get all active sessions for the currently authenticated user
     """
     getUserSessions: [Session!]!
+  }
+
+  extend type Mutation {
+    """
+    Revoke single or multiple sessions
+    """
+    revokeSessions(sessionIds: [ID!]!): RevokeSessionsResponse!
   }
 `;
 
@@ -40,4 +51,8 @@ interface SessionType {
   isActive: boolean;
 }
 
-export type { SessionType };
+interface RevokeSessionsArgs {
+  sessionIds: string[]; // required, client sends the sessions to revoke
+}
+
+export type { SessionType, RevokeSessionsArgs };

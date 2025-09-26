@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { parse } from "useragent";
 import { GraphqlContext } from "../context";
+import { RevokeSessionsArgs } from "../typedefs/sessions";
 
 export const sessionResolvers = {
   Query: {
@@ -41,13 +42,7 @@ export const sessionResolvers = {
         });
 
         // Enrich with parsed UA + mark current device
-        console.log(
-          "Found sessions:",
-          sessions.map((s) => ({
-            id: s.id,
-            userAgent: s.userAgent?.substring(0, 50),
-          }))
-        );
+
         return sessions.map((session) => {
           const agent = parse(session.userAgent || "");
 
@@ -85,6 +80,41 @@ export const sessionResolvers = {
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
         throw new Error("Unable to retrieve sessions");
+      }
+    },
+  },
+  Mutation: {
+    revokeSessions: async (
+      _: unknown,
+      args: RevokeSessionsArgs,
+      ctx: GraphqlContext
+    ) => {
+      const { user, prisma, req } = ctx;
+
+      // const currentSessionId = req?.headers["session-id"];
+
+      if (!user?.id) throw new Error("User not authenticated");
+      if (!args.sessionIds || args.sessionIds.length === 0)
+        throw new Error("Provide session IDs to revoke");
+
+      try {
+        const result = await prisma.session.updateMany({
+          where: {
+            userId: user.id,
+            id: { in: args.sessionIds },
+            isActive: true,
+            // NOT: { id: currentSessionId }, // always exclude current session
+          },
+          data: { isActive: false },
+        });
+
+        return {
+          success: true,
+          revokedCount: result.count,
+        };
+      } catch (error) {
+        console.error("Failed to revoke sessions:", error);
+        return { success: false, revokedCount: 0 };
       }
     },
   },

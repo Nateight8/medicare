@@ -24,13 +24,13 @@ export const sessionOperation = {
     `,
   },
   Mutations: {
-    // revokeSession: gql`
-    //   mutation DeleteAccount {
-    //     deleteAccount {
-    //       success
-    //     }
-    //   }
-    // `,
+    revokeSessions: gql`
+      mutation RevokeSessions($sessionIds: [ID!]!) {
+        revokeSessions(sessionIds: $sessionIds) {
+          success
+        }
+      }
+    `,
   },
 };
 
