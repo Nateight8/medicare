@@ -199,10 +199,16 @@ const config: Config = {
   // Whether to use watchman for file crawling
   // watchman: true,
 
-  preset: "ts-jest",
-
+  preset: "ts-jest/presets/default-esm", // use the ESM preset
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
   transform: {
-    "^.+\\.tsx?$": ["ts-jest", { tsconfig: "tsconfig.json" }],
+    "^.+\\.(ts|tsx)$": [
+      "ts-jest",
+      {
+        useESM: true,
+        tsconfig: "tsconfig.json",
+      },
+    ],
   },
 };
 
