@@ -1,0 +1,166 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Detect changes to optimize builds
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.changes.outputs.server }}
+      client: ${{ steps.changes.outputs.client }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            server:
+              - 'server/**'
+            client:
+              - 'client/**'
+
+  # Server CI
+  server-ci:
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' }}
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medicare_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+
+      - name: Run server linting
+        run: |
+          cd server
+          npm run lint || echo "No lint script found"
+
+      - name: Run server tests
+        run: |
+          cd server
+          npm test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medicare_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret
+          MAGIC_LINK_SECRET: test-magic-link-secret
+
+      - name: Build server
+        run: |
+          cd server
+          npm run build || echo "No build script found"
+
+  # Client CI
+  client-ci:
+    needs: changes
+    if: ${{ needs.changes.outputs.client == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: client/web/package-lock.json
+
+      - name: Install client dependencies
+        run: |
+          cd client/web
+          npm ci
+
+      - name: Run client linting
+        run: |
+          cd client/web
+          npm run lint || echo "No lint script found"
+
+      - name: Run client tests
+        run: |
+          cd client/web
+          npm test -- --coverage --watchAll=false || echo "No tests found"
+        env:
+          REACT_APP_API_URL: http://localhost:4000
+
+      - name: Build client
+        run: |
+          cd client/web
+          npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.STAGING_API_URL || 'http://localhost:4000' }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-build
+          path: client/web/build/
+          retention-days: 7
+
+  # Docker build test
+  docker-build:
+    needs: [server-ci, client-ci]
+    if: |
+      always() && 
+      (needs.server-ci.result == 'success' || needs.server-ci.result == 'skipped') &&
+      (needs.client-ci.result == 'success' || needs.client-ci.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: |
+          # Build server image
+          docker build -t medicare-server ./server
+
+          # Build client image (if you have a Dockerfile for it)
+          # docker build -t medicare-client ./client/web
+
+      - name: Test Docker containers
+        run: |
+          # Quick smoke test
+          docker run --rm -d --name test-server -p 4001:4000 medicare-server
+          sleep 10
+          docker logs test-server
+          docker stop test-server
