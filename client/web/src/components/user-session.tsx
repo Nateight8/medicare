@@ -2,6 +2,7 @@ import {
   DeviceMobileSpeakerIcon,
   XIcon,
   DeviceTabletCameraIcon,
+  SmileyXEyesIcon,
 } from "@phosphor-icons/react";
 import { Button } from "./ui/button";
 import {
@@ -46,7 +47,7 @@ export default function UserSessions() {
           <InfoCardHeader>
             <InfoCardTitle>Devices</InfoCardTitle>
           </InfoCardHeader>
-          <InfoCardContent className="bg-transparent divide-y-0">
+          <InfoCardContent className="bg-transparent divide-y-0 border-0">
             <>
               <p className="text-sm text-muted-foreground">
                 Here are the devices that have logged in to your account. You
@@ -83,9 +84,15 @@ export default function UserSessions() {
             <div className="py-4">
               <h2 className="mb-4">Other Devices</h2>
               {otherDevices && otherDevices?.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No known devices found
-                </p>
+                <div className="flex h-20 border border-border/10 items-center justify-center flex-col space-y-4">
+                  <SmileyXEyesIcon
+                    className="text-muted-foreground"
+                    size={32}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    No known devices found
+                  </p>
+                </div>
               ) : (
                 otherDevices?.map((device) => (
                   <Device key={device.id} {...device} />
