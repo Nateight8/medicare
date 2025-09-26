@@ -1,4 +1,8 @@
-import { DeviceMobileSpeakerIcon, XIcon } from "@phosphor-icons/react";
+import {
+  DeviceMobileSpeakerIcon,
+  XIcon,
+  DeviceTabletCameraIcon,
+} from "@phosphor-icons/react";
 import { Button } from "./ui/button";
 import {
   InfoCard,
@@ -7,8 +11,27 @@ import {
   InfoCardTitle,
 } from "@/app/profile/_component/info-card";
 import { LaptopIcon } from "lucide-react";
+import { useQuery } from "@apollo/client";
+import {
+  getUserSessionsResponse,
+  sessionOperation,
+  userSession,
+} from "@/graphql/operations/session";
+import { getCompactRelativeTime } from "@/lib/relative-time";
 
 export default function UserSessions() {
+  const { data } = useQuery<getUserSessionsResponse>(
+    sessionOperation.Queries.getUserSessions
+  );
+
+  const currentDevice = data?.getUserSessions.find(
+    (session) => session.isCurrentDevice
+  );
+
+  const otherDevices = data?.getUserSessions.filter(
+    (session) => !session.isCurrentDevice
+  );
+
   return (
     <div className="w-full min-h-screen border flex justify-center relative">
       <Button
@@ -39,12 +62,22 @@ export default function UserSessions() {
               <div className="flex py-2 items-center justify-between">
                 <div className="space-x-4 flex items-center flex-1">
                   <div className="size-14 rounded-full bg-muted flex items-center justify-center">
-                    <LaptopIcon className="text-muted-foreground" />
+                    {currentDevice &&
+                      renderDeviceIcon({
+                        deviceType: currentDevice?.deviceType,
+                      })}
                   </div>
                   <div>
-                    <p className="">MacBook Pro</p>
+                    <p className="">{currentDevice?.os}</p>
                     <p className="text-xs text-muted-foreground">
-                      Enugu, Nigeria
+                      <span>
+                        {currentDevice?.city || "🌎"}
+                      </span>
+                      <span className="mx-2">•</span>
+                      <span>
+                        {currentDevice &&
+                          getCompactRelativeTime(currentDevice?.lastActive)}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -52,14 +85,8 @@ export default function UserSessions() {
             </div>
             <div className="py-4">
               <h2 className="mb-4">Other Devices</h2>
-              {DeviceList.map((device) => (
-                <Device
-                  deviceType={device.deviceType}
-                  key={device.device}
-                  device={device.device}
-                  location={device.location}
-                  lastActive={device.lastActive}
-                />
+              {otherDevices?.map((device) => (
+                <Device key={device.id} {...device} />
               ))}
             </div>
           </InfoCardContent>
@@ -69,33 +96,19 @@ export default function UserSessions() {
   );
 }
 
-function Device({
-  device,
-  location,
-  lastActive,
-  deviceType,
-}: {
-  device: string;
-  location: string;
-  lastActive: string;
-  deviceType: "Desktop" | "Mobile";
-}) {
+function Device({ lastActive, deviceType, city, os }: userSession) {
   return (
     <div className="flex py-2 items-center justify-between">
       <div className="space-x-4 flex items-center flex-1">
         <div className="size-14 rounded-full bg-muted flex items-center justify-center">
-          {deviceType === "Desktop" ? (
-            <LaptopIcon className="text-muted-foreground" />
-          ) : (
-            <DeviceMobileSpeakerIcon className="text-muted-foreground" />
-          )}
+          {renderDeviceIcon({ deviceType })}
         </div>
         <div>
-          <p className="">{device}</p>
+          <p className="">{os}</p>
           <p className="text-xs text-muted-foreground">
-            <span>{location}</span>
+            <span>{city}</span>
             <span className="mx-2">•</span>
-            <span>{lastActive}</span>
+            <span>{lastActive && getCompactRelativeTime(lastActive)}</span>
           </p>
         </div>
       </div>
@@ -106,23 +119,15 @@ function Device({
   );
 }
 
-const DeviceList = [
-  {
-    device: "MacBook Pro",
-    location: "Enugu, Nigeria",
-    lastActive: "2 hours ago",
-    deviceType: "Desktop" as const,
-  },
-  {
-    device: "iPhone 12",
-    location: "Enugu, Nigeria",
-    lastActive: "2 hours ago",
-    deviceType: "Mobile" as const,
-  },
-  {
-    device: "MacBook Pro",
-    location: "Enugu, Nigeria",
-    lastActive: "2 hours ago",
-    deviceType: "Desktop" as const,
-  },
-];
+function renderDeviceIcon({ deviceType }: { deviceType: string }) {
+  switch (deviceType) {
+    case "DESKTOP":
+      return <LaptopIcon className="text-muted-foreground" />;
+    case "TABLET":
+      return <DeviceTabletCameraIcon className="text-muted-foreground" />;
+    case "MOBILE":
+      return <DeviceMobileSpeakerIcon className="text-muted-foreground" />;
+    default:
+      return null;
+  }
+}

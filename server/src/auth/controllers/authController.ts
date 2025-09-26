@@ -7,7 +7,7 @@ import { TokenPayload } from "../types";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { addDays, isBefore } from "date-fns";
-import { SessionService } from "../services/sessionService";
+import { createSession } from "../services/sessionService";
 import { magicLinkConfig } from "../config/magicLinkConfig";
 
 const magicLinkService = new MagicLinkServiceImpl(magicLinkConfig);
@@ -221,7 +221,7 @@ export const authController = {
       });
 
       // Create a new session
-      await SessionService.createSession(user.id, req, addDays(new Date(), 30));
+      await createSession(user.id, req);
 
       // Clean up Redis - auth is now complete
       await Promise.all([
