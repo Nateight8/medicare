@@ -1,5 +1,7 @@
 version: "3.8"
+
 services:
+  # Web application service (frontend)
   web:
     build:
       context: .
@@ -8,32 +10,58 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - REACT_APP_API_URL=http://localhost:4000
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+  # Server/API service (backend)
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-medicare}
+      - REDIS_URL=redis://redis:6379
+      - PORT=4000
     depends_on:
       - postgres
       - redis
-      - dynamodb-local
+    networks:
+      - app-network
 
+  # PostgreSQL database
   postgres:
-    image: postgres:14
+    image: postgres:15
+    container_name: medicare-db
     environment:
-      POSTGRES_DB: propertyhub_dev
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: devpass
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-medicare}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
 
+  # Redis for caching and sessions
   redis:
     image: redis:7-alpine
+    container_name: medicare-redis
     ports:
       - "6379:6379"
-
-  dynamodb-local:
-    image: amazon/dynamodb-local
-    ports:
-      - "8000:8000"
-    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
