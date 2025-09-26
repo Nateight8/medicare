@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import geoip from "geoip-lite";
-import { nanoid } from "nanoid";
+import { nanoid } from "nanoid/non-secure";
 
 interface SessionRequest {
   headers: { [key: string]: string | string[] | undefined };
