@@ -149,10 +149,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server Docker image
+        working-directory: server
         run: |
-          # Build server image
-          cd server
+          # Verify Dockerfile exists
+          ls -la
+          # Build the image
           docker build -t medicare-server .
 
       - name: Test Docker containers
