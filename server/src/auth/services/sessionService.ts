@@ -12,7 +12,7 @@ const SESSION_TTL_DAYS = parseInt(process.env.SESSION_TTL_DAYS || "30");
 /**
  * Extract IP address from request, handling various proxy scenarios
  */
-function extractIp(req: SessionRequest): string {
+export function extractIp(req: SessionRequest): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string") {
     const firstIp = forwarded.split(",")[0];
@@ -24,6 +24,12 @@ function extractIp(req: SessionRequest): string {
   return req.ip || "";
 }
 
+export function extractUserAgent(req: SessionRequest): string {
+  const userAgent = Array.isArray(req.headers["user-agent"])
+    ? req.headers["user-agent"][0] || ""
+    : req.headers["user-agent"] || "";
+  return userAgent;
+}
 /**
  * Create or update a session for a user
  */
@@ -31,9 +37,8 @@ function extractIp(req: SessionRequest): string {
 export async function createSession(userId: string, req: SessionRequest) {
   if (!userId) throw new Error("User ID is required");
 
-  const userAgent = Array.isArray(req.headers["user-agent"])
-    ? req.headers["user-agent"][0] || ""
-    : req.headers["user-agent"] || "";
+  const userAgent = extractUserAgent(req);
+
   const ip = extractIp(req);
   const geo = ip ? geoip.lookup(ip) : null;
 

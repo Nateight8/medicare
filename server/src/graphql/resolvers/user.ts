@@ -5,6 +5,7 @@ import { UpdateProfileInput } from "../typedefs/user";
 import { redisUtil } from "@/lib/redis";
 import { createHash } from "crypto";
 import { accountDeletionQueue } from "@/queues/accountDeletion";
+import { extractIp, extractUserAgent } from "@/auth/services/sessionService";
 
 export const userResolvers = {
   Query: {
@@ -206,6 +207,26 @@ export const userResolvers = {
             where: { tokenHash: refreshTokenHash, userId: user.id },
           });
         }
+
+        // 🔑 Mark session inactive
+        if (!req) {
+          throw new Error("Request object is not available");
+        }
+
+        const userAgent = extractUserAgent(req);
+
+        // Cast req to any to satisfy the SessionRequest interface
+        const ip = extractIp(req as any);
+
+        await prisma.session.updateMany({
+          where: {
+            userId: user.id,
+            userAgent,
+            ip,
+            isActive: true,
+          },
+          data: { isActive: false },
+        });
 
         // Clear cookies
         res?.clearCookie("auth_token", {
