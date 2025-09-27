@@ -1,4 +1,3 @@
-// src/auth/services/emailService.ts
 import * as nodemailer from "nodemailer";
 import { EmailService } from "../types";
 

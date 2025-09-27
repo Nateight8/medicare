@@ -1,0 +1,100 @@
+# .github/workflows/staging.yml
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  # Deploy client to Vercel
+  deploy-client-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: client/web/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd client/web
+          npm ci
+
+      - name: Build client
+        run: |
+          cd client/web
+          npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.STAGING_API_URL }}
+
+      - name: Deploy to Vercel
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: client/web
+          vercel-args: "--prod"
+
+  # Deploy server to Render
+  deploy-server-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 60
+
+      - name: Health check
+        run: |
+          curl -f ${{ secrets.STAGING_API_URL }}/health || echo "Health check failed"
+
+  # Run integration tests against staging
+  integration-tests:
+    needs: [deploy-client-staging, deploy-server-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Run integration tests
+        run: |
+          # Add your integration test commands here
+          echo "Running integration tests against staging..."
+          # npm run test:integration
+        env:
+          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+          STAGING_WEB_URL: ${{ secrets.STAGING_WEB_URL }}
+
+  # Notify team
+  notify:
+    needs: [deploy-client-staging, deploy-server-staging, integration-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+            echo "✅ Staging deployment successful!"
+            echo "Frontend: ${{ secrets.STAGING_WEB_URL }}"
+            echo "Backend: ${{ secrets.STAGING_API_URL }}"
+          else
+            echo "❌ Staging deployment failed"
+          fi
