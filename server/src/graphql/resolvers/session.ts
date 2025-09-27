@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { parse } from "useragent";
 import { GraphqlContext } from "../context";
 import { RevokeSessionsArgs } from "../typedefs/sessions";
+import { Session } from "@prisma/client";
 
 export const sessionResolvers = {
   Query: {
@@ -38,12 +39,14 @@ export const sessionResolvers = {
             createdAt: true,
             lastActive: true,
             expiresAt: true,
+            userId: true,
+            isActive: true,
           },
         });
 
         // Enrich with parsed UA + mark current device
 
-        return sessions.map((session: { userAgent?: string | null }) => {
+        return sessions.map((session: Session) => {
           const agent = parse(session.userAgent || "");
 
           let deviceType: "DESKTOP" | "MOBILE" | "TABLET" = "DESKTOP";
