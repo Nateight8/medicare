@@ -138,11 +138,11 @@ jobs:
           path: client/web/build/
           retention-days: 7
 
-  # Docker build test
+  # Docker Build & Smoke Test
   docker-build:
     needs: [server-ci, client-ci]
     if: |
-      always() && 
+      always() &&
       (needs.server-ci.result == 'success' || needs.server-ci.result == 'skipped') &&
       (needs.client-ci.result == 'success' || needs.client-ci.result == 'skipped')
     runs-on: ubuntu-latest
@@ -155,14 +155,11 @@ jobs:
       - name: Build server Docker image
         working-directory: server
         run: |
-          # Verify Dockerfile exists
           ls -la
-          # Build the image
           docker build -t medicare-server .
 
       - name: Test Docker containers
         run: |
-          # Quick smoke test
           docker run --rm -d --name test-server -p 4000:4000 -e NODE_ENV=test -e PORT=4000 medicare-server
           sleep 10
           docker logs test-server

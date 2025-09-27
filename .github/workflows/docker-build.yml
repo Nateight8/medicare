@@ -1,0 +1,32 @@
+name: Docker Build & Smoke Test
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"] # depends on ci.yml workflow finishing
+    types:
+      - completed
+
+jobs:
+  docker-build:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start services with Docker Compose
+        run: |
+          docker-compose up -d --build
+          sleep 25
+          docker-compose ps
+          docker-compose logs server
+
+      - name: Run smoke test against server
+        run: |
+          curl --fail http://localhost:4000/health || exit 1
+
+      - name: Shut down services
+        run: docker-compose down -v
