@@ -1,32 +1,41 @@
-name: Docker Build & Smoke Test
+docker-build:
+  needs: [server-ci, client-ci]
+  if: |
+    always() && 
+    (needs.server-ci.result == 'success' || needs.server-ci.result == 'skipped') &&
+    (needs.client-ci.result == 'success' || needs.client-ci.result == 'skipped')
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
 
-on:
-  workflow_run:
-    workflows: ["CI Pipeline"] # depends on ci.yml workflow finishing
-    types:
-      - completed
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-jobs:
-  docker-build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
+    - name: Build and run containers with docker-compose
+      run: |
+        # Spin up the stack for testing
+        docker compose -f docker-compose.test.yml up -d --build
 
-    steps:
-      - uses: actions/checkout@v4
+    - name: Wait for server healthcheck
+      run: |
+        echo "Waiting for server to become healthy..."
+        for i in {1..10}; do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' medicare-server || echo "starting")
+          echo "Current status: $STATUS"
+          if [ "$STATUS" == "healthy" ]; then
+            echo "✅ Server is healthy!"
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "❌ Server did not become healthy in time"
+        docker compose -f docker-compose.test.yml logs
+        exit 1
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+    - name: Show server logs
+      if: always()
+      run: docker compose -f docker-compose.test.yml logs server
 
-      - name: Build and start services with Docker Compose
-        run: |
-          docker-compose up -d --build
-          sleep 25
-          docker-compose ps
-          docker-compose logs server
-
-      - name: Run smoke test against server
-        run: |
-          curl --fail http://localhost:4000/health || exit 1
-
-      - name: Shut down services
-        run: docker-compose down -v
+    - name: Tear down containers
+      if: always()
+      run: docker compose -f docker-compose.test.yml down
