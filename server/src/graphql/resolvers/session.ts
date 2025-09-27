@@ -43,7 +43,7 @@ export const sessionResolvers = {
 
         // Enrich with parsed UA + mark current device
 
-        return sessions.map((session) => {
+        return sessions.map((session: { userAgent?: string | null }) => {
           const agent = parse(session.userAgent || "");
 
           let deviceType: "DESKTOP" | "MOBILE" | "TABLET" = "DESKTOP";
